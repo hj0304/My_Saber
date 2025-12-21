@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ko" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Saber - Baseball Portfolio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <script>
+        // Tailwind 설정
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#007AFF',
+                        darkBg: '#1C1C1E',
+                        cardLight: '#F2F2F7',
+                        cardDark: '#2C2C2E',
+                    }
+                }
+            }
+        }
+
+        // [핵심] 페이지 로딩 시 저장된 테마 확인 및 적용
+        // 깜빡임 방지를 위해 head 태그 안에서 실행해야 함
+        if (localStorage.getItem('theme') === 'dark' || 
+           (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    </script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    </style>
+</head>
+<body class="bg-white dark:bg-darkBg text-gray-900 dark:text-white transition-colors duration-300">
+
+    <nav class="sticky top-0 z-50 backdrop-blur-md bg-white/70 dark:bg-darkBg/70 border-b border-gray-200 dark:border-gray-700">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center">
+                    <a href="/" class="font-bold text-xl tracking-tight cursor-pointer">My Saber</a>
+                    <div class="hidden md:block ml-10 flex items-baseline space-x-4">
+                        <a href="/" class="hover:text-primary px-3 py-2 rounded-md text-sm font-medium">홈</a>
+                        <a href="/analysis/strong-second/" class="hover:text-primary px-3 py-2 rounded-md text-sm font-medium">강한 2번</a>
+                        <a href="/analysis/pitcher-meta/" class="hover:text-primary px-3 py-2 rounded-md text-sm font-medium">선발 메타</a>
+                        <a href="#" class="hover:text-primary px-3 py-2 rounded-md text-sm font-medium text-gray-400">피치 터널(준비중)</a>
+                    </div>
+                </div>
+                <button id="theme-toggle" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none transition-colors">
+                    <span id="theme-icon">🌙</span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 min-h-screen">
+        {% block content %}
+        {% endblock %}
+    </main>
+
+    <script>
+        const btn = document.getElementById('theme-toggle');
+        const icon = document.getElementById('theme-icon');
+        const html = document.documentElement;
+
+        // 초기 아이콘 설정
+        function updateIcon() {
+            if (html.classList.contains('dark')) {
+                icon.innerText = '☀️'; // 다크모드일 땐 해 아이콘 보여주기
+            } else {
+                icon.innerText = '🌙'; // 라이트모드일 땐 달 아이콘 보여주기
+            }
+        }
+        updateIcon();
+
+        // 버튼 클릭 이벤트
+        btn.addEventListener('click', () => {
+            if (html.classList.contains('dark')) {
+                html.classList.remove('dark');
+                localStorage.setItem('theme', 'light'); // 저장소에 'light' 저장
+            } else {
+                html.classList.add('dark');
+                localStorage.setItem('theme', 'dark'); // 저장소에 'dark' 저장
+            }
+            updateIcon();
+        });
+    </script>
+</body>
+</html>

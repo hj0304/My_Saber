@@ -1,0 +1,91 @@
+{% extends 'core/base.html' %}
+
+{% block content %}
+<div class="space-y-10">
+    
+    <div class="text-center space-y-4">
+        <h1 class="text-4xl font-bold text-gray-900 dark:text-white">강한 2번 타자 이론</h1>
+        <p class="text-lg text-gray-600 dark:text-gray-400">
+            전통적인 '작전 수행형' 2번 타자에서 '최고의 타자'를 배치하는 메타로의 변화를 분석합니다.
+        </p>
+    </div>
+
+    <div class="bg-cardLight dark:bg-cardDark rounded-2xl p-6 shadow-sm">
+        <h2 class="text-2xl font-semibold mb-4">연도별 2번 타자 OPS 추이</h2>
+        <div class="relative h-80 w-full">
+            <canvas id="opsChart"></canvas>
+        </div>
+        <p class="mt-4 text-sm text-gray-500 text-center">
+            * 현재는 가상 데이터 기반입니다.
+        </p>
+    </div>
+
+    <div class="bg-white dark:bg-cardDark rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-none">
+        <h2 class="text-2xl font-semibold mb-4">대표적인 강한 2번 타자들</h2>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left">
+                <thead class="border-b dark:border-gray-600">
+                    <tr>
+                        <th class="py-3 px-4">선수명</th>
+                        <th class="py-3 px-4">팀</th>
+                        <th class="py-3 px-4">wRC+</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for player in data.top_players %}
+                    <tr class="border-b dark:border-gray-700 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-600 transition">
+                        <td class="py-3 px-4 font-medium">{{ player.name }}</td>
+                        <td class="py-3 px-4 text-gray-500 dark:text-gray-300">{{ player.team }}</td>
+                        <td class="py-3 px-4 text-primary font-bold">{{ player.wRC }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Django에서 넘겨준 데이터 받기
+    const years = {{ data.years|safe }};
+    const ops2nd = {{ data.ops_2nd|safe }};
+    const opsAvg = {{ data.ops_avg|safe }};
+
+    // Chart.js 그리기
+    const ctx = document.getElementById('opsChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: years,
+            datasets: [{
+                label: '2번 타자 평균 OPS',
+                data: ops2nd,
+                borderColor: '#007AFF', // Apple Blue
+                backgroundColor: 'rgba(0, 122, 255, 0.1)',
+                borderWidth: 3,
+                tension: 0.4, // 곡선 부드럽게
+                fill: true
+            },
+            {
+                label: '리그 평균 OPS',
+                data: opsAvg,
+                borderColor: '#8E8E93', // Gray
+                borderWidth: 2,
+                borderDash: [5, 5], // 점선
+                tension: 0.4,
+                fill: false
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom' }
+            },
+            scales: {
+                y: { beginAtZero: false }
+            }
+        }
+    });
+</script>
+{% endblock %}

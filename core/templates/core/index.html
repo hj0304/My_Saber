@@ -1,0 +1,32 @@
+{% extends 'core/base.html' %}
+
+{% block content %}
+<div class="flex flex-col items-center justify-center py-20 text-center space-y-8">
+    
+    <h1 class="text-5xl md:text-7xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-purple-600 pb-2">
+        Baseball Analytics
+    </h1>
+    <p class="text-xl text-gray-600 dark:text-gray-300 max-w-2xl">
+        데이터로 보는 야구의 새로운 관점.<br>
+        세이버메트릭스 분석부터 투구 시뮬레이션까지 직접 경험해보세요.
+    </p>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl mt-10">
+        <a href="/analysis/strong-second/" class="group block p-6 bg-white dark:bg-cardDark rounded-2xl shadow-sm hover:shadow-md transition border border-gray-100 dark:border-gray-700">
+            <h3 class="text-xl font-bold group-hover:text-primary transition">강한 2번 타자 &rarr;</h3>
+            <p class="mt-2 text-gray-500">최신 타순 트렌드와 데이터 분석</p>
+        </a>
+        
+        <a href="/analysis/pitcher-meta/" class="group block p-6 bg-white dark:bg-cardDark rounded-2xl shadow-sm hover:shadow-md transition border border-gray-100 dark:border-gray-700">
+            <h3 class="text-xl font-bold group-hover:text-primary transition">선발 투수 메타 &rarr;</h3>
+            <p class="mt-2 text-gray-500">이닝 소화 vs 실점 억제, 승률 분석</p>
+        </a>
+
+        <a href="#" class="group block p-6 bg-white dark:bg-cardDark rounded-2xl shadow-sm hover:shadow-md transition border border-gray-100 dark:border-gray-700 opacity-60">
+            <h3 class="text-xl font-bold">피치 터널 게임 (준비중)</h3>
+            <p class="mt-2 text-gray-500">타자의 시점에서 공을 바라보세요</p>
+        </a>
+    </div>
+
+</div>
+{% endblock %}

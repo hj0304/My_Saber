@@ -1,0 +1,164 @@
+{% extends 'core/base.html' %}
+
+{% block content %}
+<div class="space-y-8 animate-fade-in-up">
+    
+    <div class="text-center space-y-4">
+        <h1 class="text-4xl font-bold text-gray-900 dark:text-white">선발 투수 가치 평가</h1>
+        <p class="text-lg text-gray-600 dark:text-gray-400">
+            이닝 소화(Inning Eating) vs 실점 억제(Run Suppression)<br>
+            팀 승리에 더 기여하는 투수는 누구일까요?
+        </p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        <div class="bg-white dark:bg-cardDark p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+            <h3 class="text-xl font-bold mb-4 text-blue-500">투수 A (이닝이터)</h3>
+            <div class="flex space-x-4">
+                <div class="w-1/2">
+                    <label class="block text-sm font-medium text-gray-500 mb-1">이닝 (IP)</label>
+                    <select id="select-ip-a" class="w-full p-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-none focus:ring-2 focus:ring-blue-500" onchange="updateChart()">
+                        </select>
+                </div>
+                <div class="w-1/2">
+                    <label class="block text-sm font-medium text-gray-500 mb-1">실점 (R)</label>
+                    <select id="select-run-a" class="w-full p-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-none focus:ring-2 focus:ring-blue-500" onchange="updateChart()">
+                        </select>
+                </div>
+            </div>
+            <div class="mt-4 text-center">
+                <span class="text-sm text-gray-400">예상 승률</span>
+                <div id="win-rate-a" class="text-4xl font-bold text-gray-900 dark:text-white">--%</div>
+            </div>
+        </div>
+
+        <div class="bg-white dark:bg-cardDark p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+            <h3 class="text-xl font-bold mb-4 text-red-500">투수 B (짠물투)</h3>
+            <div class="flex space-x-4">
+                <div class="w-1/2">
+                    <label class="block text-sm font-medium text-gray-500 mb-1">이닝 (IP)</label>
+                    <select id="select-ip-b" class="w-full p-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-none focus:ring-2 focus:ring-red-500" onchange="updateChart()">
+                        </select>
+                </div>
+                <div class="w-1/2">
+                    <label class="block text-sm font-medium text-gray-500 mb-1">실점 (R)</label>
+                    <select id="select-run-b" class="w-full p-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-none focus:ring-2 focus:ring-red-500" onchange="updateChart()">
+                        </select>
+                </div>
+            </div>
+            <div class="mt-4 text-center">
+                <span class="text-sm text-gray-400">예상 승률</span>
+                <div id="win-rate-b" class="text-4xl font-bold text-gray-900 dark:text-white">--%</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-cardLight dark:bg-cardDark p-6 rounded-2xl shadow-sm">
+        <h3 class="text-lg font-semibold mb-4 text-center">승리 확률 비교</h3>
+        <div class="relative h-64 w-full">
+            <canvas id="comparisonChart"></canvas>
+        </div>
+    </div>
+    
+    <div class="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-xl text-sm text-blue-800 dark:text-blue-200">
+        <strong>💡 Insight:</strong>
+        <span id="insight-text">데이터를 선택하여 비교 결과를 확인하세요.</span>
+    </div>
+
+</div>
+
+<script>
+    // 1. Django에서 보낸 데이터 받기
+    const matrixData = JSON.parse('{{ matrix_json|safe }}');
+    
+    // 2. 초기화 및 헬퍼 함수
+    function getWinRate(ip, runs) {
+        const data = matrixData.find(d => d.ip == ip && d.runs == runs);
+        return data ? data.win_rate : 0;
+    }
+
+    // 3. 드롭다운 옵션 생성 함수
+    function populateSelects() {
+        const ips = [1,2,3,4,5,6,7,8,9];
+        const runs = [0,1,2,3,4,5,6,7,8,9,10];
+        
+        // 투수 A, B의 select 엘리먼트들
+        const selectsIp = [document.getElementById('select-ip-a'), document.getElementById('select-ip-b')];
+        const selectsRun = [document.getElementById('select-run-a'), document.getElementById('select-run-b')];
+        
+        selectsIp.forEach(sel => {
+            ips.forEach(i => sel.innerHTML += `<option value="${i}">${i} 이닝</option>`);
+        });
+        selectsRun.forEach(sel => {
+            runs.forEach(r => sel.innerHTML += `<option value="${r}">${r} 실점</option>`);
+        });
+
+        // 초기값 설정 (9이닝 3실점 vs 6이닝 무실점)
+        document.getElementById('select-ip-a').value = 9;
+        document.getElementById('select-run-a').value = 3;
+        
+        document.getElementById('select-ip-b').value = 6;
+        document.getElementById('select-run-b').value = 0;
+    }
+
+    // 4. 차트 설정
+    let myChart = null;
+    
+    function updateChart() {
+        const ipA = document.getElementById('select-ip-a').value;
+        const runA = document.getElementById('select-run-a').value;
+        const ipB = document.getElementById('select-ip-b').value;
+        const runB = document.getElementById('select-run-b').value;
+
+        const winRateA = getWinRate(ipA, runA);
+        const winRateB = getWinRate(ipB, runB);
+
+        // 텍스트 업데이트
+        document.getElementById('win-rate-a').innerText = winRateA + '%';
+        document.getElementById('win-rate-b').innerText = winRateB + '%';
+
+        // 인사이트 텍스트 업데이트
+        const diff = (winRateA - winRateB).toFixed(1);
+        const textElem = document.getElementById('insight-text');
+        if (diff > 0) textElem.innerText = `투수 A가 투수 B보다 승리 확률이 ${diff}%p 더 높습니다. 이닝 소화 능력이 더 고평가되었습니다.`;
+        else if (diff < 0) textElem.innerText = `투수 B가 투수 A보다 승리 확률이 ${Math.abs(diff)}%p 더 높습니다. 실점 억제가 더 중요하게 작용했습니다.`;
+        else textElem.innerText = "두 투수의 기대 승률이 동일합니다.";
+
+        // 차트 업데이트
+        const ctx = document.getElementById('comparisonChart').getContext('2d');
+        
+        if (myChart) myChart.destroy();
+
+        myChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['투수 A', '투수 B'],
+                datasets: [{
+                    label: '기대 승률 (%)',
+                    data: [winRateA, winRateB],
+                    backgroundColor: ['#3B82F6', '#EF4444'], // Blue, Red
+                    borderRadius: 8,
+                    barThickness: 50,
+                }]
+            },
+            options: {
+                indexAxis: 'y', // 가로 막대 그래프
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { beginAtZero: true, max: 100 }
+                },
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+    }
+
+    // 실행
+    populateSelects();
+    updateChart();
+
+</script>
+{% endblock %}

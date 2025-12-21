@@ -1,0 +1,20 @@
+# Python 관련
+*.pyc
+__pycache__/
+*.py[cod]
+
+# Django 관련
+*.log
+local_settings.py
+db.sqlite3
+media
+staticfiles
+
+# 가상환경 (제일 중요! 이거 올라가면 안 됨)
+venv/
+env/
+.env
+
+# IDE 설정 파일 (VSCode, Pycharm 등)
+.idea/
+.vscode/
