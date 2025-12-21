@@ -1,0 +1,184 @@
+{% extends 'core/base.html' %}
+
+{% block content %}
+<div class="space-y-8 animate-fade-in-up">
+    
+    <div class="text-center space-y-4">
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Reliever WPA Top 10</h1>
+        <p class="text-gray-600 dark:text-gray-400">
+            연도별 가장 승리 기여도가 높았던 불펜 투수 10명을 분석합니다.
+        </p>
+    </div>
+
+    <div class="bg-white dark:bg-cardDark p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col md:flex-row justify-between items-center gap-4">
+        
+        <div class="flex space-x-2">
+            <button id="btn-kbo" class="px-5 py-2 rounded-lg font-bold transition text-sm shadow-sm" onclick="setLeague('kbo')">
+                KBO
+            </button>
+            <button id="btn-mlb" class="px-5 py-2 rounded-lg font-bold transition text-sm" onclick="setLeague('mlb')">
+                MLB
+            </button>
+        </div>
+
+        <div class="flex items-center space-x-2">
+            <label class="text-sm font-medium text-gray-500">Year:</label>
+            <select id="yearSelect" class="bg-gray-100 dark:bg-gray-700 border-none rounded-lg py-2 px-4 focus:ring-2 focus:ring-primary font-bold text-gray-900 dark:text-white" onchange="updateDashboard()">
+                </select>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        
+        <div class="bg-white dark:bg-cardDark p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+            <h3 class="text-lg font-bold mb-4 text-center">Top 10 Relievers Position</h3>
+            <div class="relative h-80 w-full">
+                <canvas id="reliefChart"></canvas>
+            </div>
+            <p class="mt-4 text-xs text-center text-gray-400">
+                X축: gmLI (긴박함) / Y축: WPA (승리 기여)
+            </p>
+        </div>
+
+        <div class="bg-white dark:bg-cardDark p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col">
+            <h3 class="text-lg font-bold mb-4 flex justify-between">
+                <span>WPA Ranking</span>
+                <span id="rankYearLabel" class="text-primary">2025</span>
+            </h3>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="border-b dark:border-gray-600 text-xs uppercase text-gray-400">
+                            <th class="py-2 px-2">Rank</th>
+                            <th class="py-2 px-2">Player</th>
+                            <th class="py-2 px-2 text-right">gmLI</th>
+                            <th class="py-2 px-2 text-right">WPA</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rankingTableBody" class="text-sm">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // 1. Django 데이터 파싱
+    const allData = JSON.parse('{{ all_data|safe }}'); // { kbo: {2016:[],...}, mlb: {...} }
+    const years = JSON.parse('{{ years|safe }}');
+    
+    // 상태 변수
+    let currentLeague = 'kbo';
+    let reliefChart = null;
+
+    // 2. 초기화 (연도 옵션 채우기)
+    const yearSelect = document.getElementById('yearSelect');
+    years.forEach(y => {
+        const opt = document.createElement('option');
+        opt.value = y;
+        opt.innerText = y;
+        yearSelect.appendChild(opt);
+    });
+    // 기본값: 가장 최근 연도 (2025)
+    yearSelect.value = years[years.length - 1];
+
+    // 3. 리그 선택 함수
+    function setLeague(league) {
+        currentLeague = league;
+        
+        // 버튼 스타일 토글
+        const btnKbo = document.getElementById('btn-kbo');
+        const btnMlb = document.getElementById('btn-mlb');
+        const activeClass = "bg-primary text-white shadow-md";
+        const inactiveClass = "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600";
+
+        if (league === 'kbo') {
+            btnKbo.className = `px-5 py-2 rounded-lg font-bold transition text-sm ${activeClass}`;
+            btnMlb.className = `px-5 py-2 rounded-lg font-bold transition text-sm ${inactiveClass}`;
+        } else {
+            btnKbo.className = `px-5 py-2 rounded-lg font-bold transition text-sm ${inactiveClass}`;
+            btnMlb.className = `px-5 py-2 rounded-lg font-bold transition text-sm ${activeClass}`;
+        }
+
+        updateDashboard();
+    }
+
+    // 4. 메인 업데이트 함수
+    function updateDashboard() {
+        const selectedYear = yearSelect.value;
+        document.getElementById('rankYearLabel').innerText = selectedYear;
+
+        // 해당 리그, 해당 연도 데이터 가져오기
+        const rawList = allData[currentLeague][selectedYear];
+        
+        // WPA 내림차순 정렬 후 상위 10명만 자르기 (Top 10)
+        const top10List = rawList.sort((a, b) => b.wpa - a.wpa).slice(0, 10);
+
+        // --- 차트 업데이트 ---
+        const ctx = document.getElementById('reliefChart').getContext('2d');
+        if (reliefChart) reliefChart.destroy();
+
+        reliefChart = new Chart(ctx, {
+            type: 'scatter',
+            data: {
+                datasets: [{
+                    label: 'Top 10 Players',
+                    data: top10List.map(p => ({ x: p.gmli, y: p.wpa, player: p })),
+                    backgroundColor: '#007AFF', // Apple Blue
+                    borderColor: '#fff',
+                    borderWidth: 1,
+                    pointRadius: 6,
+                    pointHoverRadius: 9
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => `${ctx.raw.player.name}: WPA ${ctx.raw.player.wpa}`
+                        }
+                    }
+                },
+                scales: {
+                    x: { 
+                        title: { display: true, text: 'gmLI (Leverage)' },
+                        min: 0.5, max: 2.5 
+                    },
+                    y: { 
+                        title: { display: true, text: 'WPA' },
+                        beginAtZero: false 
+                    }
+                }
+            }
+        });
+
+        // --- 테이블 업데이트 ---
+        const tableBody = document.getElementById('rankingTableBody');
+        tableBody.innerHTML = '';
+
+        top10List.forEach((p, index) => {
+            const tr = document.createElement('tr');
+            tr.className = "border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition group";
+            tr.innerHTML = `
+                <td class="py-3 px-2 font-bold text-gray-500 group-hover:text-primary transition">${index + 1}</td>
+                <td class="py-3 px-2">
+                    <div class="font-bold text-gray-800 dark:text-gray-200">${p.name}</div>
+                    <div class="text-xs text-gray-400">${p.team}</div>
+                </td>
+                <td class="py-3 px-2 text-right font-mono text-gray-600 dark:text-gray-400">${p.gmli.toFixed(2)}</td>
+                <td class="py-3 px-2 text-right font-mono font-bold text-blue-600 dark:text-blue-400">${p.wpa.toFixed(2)}</td>
+            `;
+            tableBody.appendChild(tr);
+        });
+    }
+
+    // 초기 실행 (스타일 적용을 위해)
+    setLeague('kbo');
+
+</script>
+{% endblock %}

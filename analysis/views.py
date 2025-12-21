@@ -6,57 +6,61 @@ import random
 # ------------------------------------------------------------------------------------------------------------------------
 # 강한 2번 타자
 def strong_second_view(request):
-    # 1. MLB 팀 목록
+    years = list(range(2016, 2026)) # 2016 ~ 2025
+    
+    # 1. 팀 목록 정의
     mlb_teams = [
         "ARI", "ATL", "BAL", "BOS", "CHC", "CWS", "CIN", "CLE", "COL", "DET",
         "HOU", "KC", "LAA", "LAD", "MIA", "MIL", "MIN", "NYM", "NYY", "OAK",
         "PHI", "PIT", "SD", "SF", "SEA", "STL", "TB", "TEX", "TOR", "WSH"
     ]
-    
-    # 2. 연도 목록
-    years = list(range(2016, 2026)) # 2016 ~ 2025
-    
-    # 3. 데이터 구조 생성 (가상 데이터)
-    # 실제로는 DB에서 가져와야 할 데이터 구조입니다.
-    # 구조: data[팀][연도][타순] = { ops: 0.888, top_player: "Player Name" }
-    
-    all_data = {}
-    league_avg_data = {} # 리그 평균 (연도별, 타순별)
+    kbo_teams = [
+        "KIA", "Samsung", "LG", "Doosan", "KT", "SSG", "Lotte", "Hanwha", "NC", "Kiwoom"
+    ]
 
-    # (1) 리그 평균 데이터 생성
-    for year in years:
-        league_avg_data[year] = {}
-        for order in range(1, 10):
-            # 2~5번 타순은 OPS가 높게, 하위 타선은 낮게 나오도록 랜덤 조정
-            base_ops = 0.750 if order in [2, 3, 4, 5] else 0.650
-            league_avg_data[year][order] = round(base_ops + random.uniform(-0.05, 0.05), 3)
+    # 2. 선수 이름 풀
+    mlb_players = ["Ohtani", "Judge", "Betts", "Freeman", "Soto", "Acuna", "Harper", "Witt Jr.", "Henderson", "Trout"]
+    kbo_players = ["김도영", "구자욱", "홍창기", "양의지", "최정", "로하스", "에레디아", "박건우", "강백호", "노시환"]
 
-    # (2) 팀별 데이터 생성
-    player_names = ["Ohtani", "Judge", "Betts", "Freeman", "Trout", "Harper", "Soto", "Acuna", "Witt Jr.", "Henderson"]
-    
-    for team in mlb_teams:
-        all_data[team] = {}
+    # 3. 데이터 생성 함수 (리그별)
+    def generate_league_data(teams, player_names):
+        league_data = {} # 팀별 데이터
+        avg_data = {}    # 리그 평균 데이터 (연도별)
+
+        # (1) 리그 평균 생성
         for year in years:
-            all_data[team][year] = {}
+            avg_data[year] = {}
             for order in range(1, 10):
-                # 리그 평균을 기준으로 약간의 편차를 둠
-                avg = league_avg_data[year][order]
-                team_ops = round(avg + random.uniform(-0.10, 0.10), 3)
-                
-                # 가상 선수 이름
-                top_player = f"{random.choice(player_names)} ({team})"
-                
-                all_data[team][year][order] = {
-                    'ops': team_ops,
-                    'player_name': top_player,
-                    'games': random.randint(100, 162) # 출장 경기 수
-                }
+                # 2번 타자 강세 트렌드 반영 (랜덤)
+                base = 0.780 if order == 2 else 0.700
+                avg_data[year][order] = round(base + random.uniform(-0.05, 0.05), 3)
+
+        # (2) 팀별 상세 데이터 생성
+        for team in teams:
+            league_data[team] = {}
+            for year in years:
+                league_data[team][year] = {}
+                for order in range(1, 10):
+                    avg = avg_data[year][order]
+                    league_data[team][year][order] = {
+                        'ops': round(avg + random.uniform(-0.1, 0.1), 3),
+                        'player_name': f"{random.choice(player_names)}",
+                        'games': random.randint(80, 144)
+                    }
+        return league_data, avg_data
+
+    # 4. 데이터 생성 및 구조화
+    kbo_teams_data, kbo_avg = generate_league_data(kbo_teams, kbo_players)
+    mlb_teams_data, mlb_avg = generate_league_data(mlb_teams, mlb_players)
+
+    all_data = {
+        'kbo': {'teams_data': kbo_teams_data, 'avg_data': kbo_avg, 'team_list': kbo_teams},
+        'mlb': {'teams_data': mlb_teams_data, 'avg_data': mlb_avg, 'team_list': mlb_teams}
+    }
 
     context = {
-        'mlb_teams': json.dumps(mlb_teams),
         'years': json.dumps(years),
-        'all_data': json.dumps(all_data),         # 팀별 상세 데이터
-        'league_avg': json.dumps(league_avg_data) # 리그 평균 데이터
+        'all_data': json.dumps(all_data)
     }
     
     return render(request, 'analysis/strong_second.html', context)
@@ -146,3 +150,110 @@ def pitcher_meta_view(request):
     }
     
     return render(request, 'analysis/pitcher_meta.html', context)
+
+# ------------------------------------------------------------------------------------------------------------------------
+# 불펜투수 지표
+def relief_metrics_view(request):
+    # 1. 설정
+    years = list(range(2016, 2026)) # 2016 ~ 2025
+    
+    # 가상 선수 이름 풀 (랜덤 생성용)
+    kbo_names = ["오승환", "김원중", "조상우", "정우영", "박영현", "서진용", "임창민", "고우석", "정해영", "이용찬", "김재윤", "문경찬", "하준영", "김태훈", "최지민"]
+    mlb_names = ["Diaz", "Hader", "Clase", "Phillips", "Holmes", "Duran", "Hendriks", "Iglesias", "Pressly", "Chapman", "Bautista", "Bednar", "Romano", "Doval", "Fairbanks"]
+    
+    # 2. 데이터 생성 함수
+    def generate_year_data(names, league_prefix):
+        year_data = {}
+        for year in years:
+            players = []
+            # 연도별로 15명의 불펜 투수 데이터 생성 (나중에 상위 10명만 자를 것임)
+            for name in names:
+                # WPA: -1.0 ~ 5.0 사이 랜덤
+                wpa = round(random.uniform(-1.0, 5.0), 2)
+                # gmLI: 0.8 ~ 2.5 사이 랜덤 (중요도)
+                gmli = round(random.uniform(0.8, 2.5), 2)
+                
+                players.append({
+                    'name': name,
+                    'team': f"{league_prefix} Team", # 팀명은 임시
+                    'wpa': wpa,
+                    'gmli': gmli,
+                    'year': year
+                })
+            
+            # WPA 높은 순으로 정렬해둠 (선택사항, 프론트에서도 할 수 있음)
+            players.sort(key=lambda x: x['wpa'], reverse=True)
+            year_data[year] = players
+        return year_data
+
+    # 3. 데이터 구축
+    all_data = {
+        'kbo': generate_year_data(kbo_names, "KBO"),
+        'mlb': generate_year_data(mlb_names, "MLB")
+    }
+
+    context = {
+        'years': json.dumps(years),
+        'all_data': json.dumps(all_data)
+    }
+    
+    return render(request, 'analysis/relief_metrics.html', context)
+
+# ------------------------------------------------------------------------------------------------------------------------
+# 가성비 선수 지표 (dollars와 Cost per WAR)
+def cost_effectiveness_view(request):
+    years = list(range(2016, 2026))
+    
+    # 가상 선수 이름
+    mlb_stars = ["Ohtani", "Judge", "Betts", "Soto", "Harper", "Cole", "Seager", "Freeman", "Semien", "Lindor", "Witt Jr.", "Henderson"]
+    kbo_stars = ["김도영", "구자욱", "최정", "양의지", "강백호", "박건우", "손아섭", "박찬호", "홍창기", "최형우", "노시환", "문동주"]
+
+    def generate_financial_data(names, league):
+        year_data = {}
+        for year in years:
+            players = []
+            for name in names:
+                # 1. WAR 생성 (0.5 ~ 8.0)
+                war = round(random.uniform(0.5, 8.5), 1)
+                
+                # 2. 연봉(Salary) 생성
+                if league == 'MLB':
+                    # $700k ~ $50M (단위: 달러)
+                    salary = random.randint(700000, 50000000)
+                    war_value_constant = 8000000 # 1 WAR = $8M
+                else: # KBO
+                    # 5000만원 ~ 25억원 (단위: 원)
+                    salary = random.randint(50000000, 2500000000)
+                    war_value_constant = 500000000 # 1 WAR = 5억
+
+                # 3. 지표 계산
+                # (1) Dollars (선수의 가치 환산 금액)
+                dollars = war * war_value_constant
+                
+                # (2) CPW (Cost Per WAR, 가성비) - 낮을수록 좋음
+                # WAR이 너무 낮으면 가성비 논하기 어려우므로 제외하거나 처리
+                cpw = salary / war if war > 0 else 999999999999
+
+                players.append({
+                    'name': name,
+                    'team': f"{league} Team",
+                    'war': war,
+                    'salary': salary,
+                    'dollars': dollars,
+                    'cpw': round(cpw)
+                })
+            
+            year_data[year] = players
+        return year_data
+
+    all_data = {
+        'mlb': generate_financial_data(mlb_stars, 'MLB'),
+        'kbo': generate_financial_data(kbo_stars, 'KBO')
+    }
+
+    context = {
+        'years': json.dumps(years),
+        'all_data': json.dumps(all_data)
+    }
+    
+    return render(request, 'analysis/cost_effectiveness.html', context)

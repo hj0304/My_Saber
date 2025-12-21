@@ -1,7 +1,7 @@
 {% extends 'core/base.html' %}
 
 {% block content %}
-<div class="flex flex-col items-center justify-center py-20 text-center space-y-8">
+<div class="flex flex-col items-center justify-center py-16 text-center space-y-8 animate-fade-in-up">
     
     <h1 class="text-5xl md:text-7xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-purple-600 pb-2">
         Baseball Analytics
@@ -11,20 +11,36 @@
         세이버메트릭스 분석부터 투구 시뮬레이션까지 직접 경험해보세요.
     </p>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl mt-10">
-        <a href="/analysis/strong-second/" class="group block p-6 bg-white dark:bg-cardDark rounded-2xl shadow-sm hover:shadow-md transition border border-gray-100 dark:border-gray-700">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl mt-10 text-left">
+        
+        <a href="/analysis/strong-second/" class="group block p-8 bg-white dark:bg-cardDark rounded-3xl shadow-sm hover:shadow-lg hover:-translate-y-1 transition duration-300 border border-gray-100 dark:border-gray-700">
+            <div class="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-2xl flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition">⚾️</div>
             <h3 class="text-xl font-bold group-hover:text-primary transition">강한 2번 타자 &rarr;</h3>
-            <p class="mt-2 text-gray-500">최신 타순 트렌드와 데이터 분석</p>
+            <p class="mt-2 text-gray-500 dark:text-gray-400">최신 타순 트렌드와 팀별 OPS 흐름 분석</p>
         </a>
         
-        <a href="/analysis/pitcher-meta/" class="group block p-6 bg-white dark:bg-cardDark rounded-2xl shadow-sm hover:shadow-md transition border border-gray-100 dark:border-gray-700">
+        <a href="/analysis/pitcher-meta/" class="group block p-8 bg-white dark:bg-cardDark rounded-3xl shadow-sm hover:shadow-lg hover:-translate-y-1 transition duration-300 border border-gray-100 dark:border-gray-700">
+            <div class="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-2xl flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition">📊</div>
             <h3 class="text-xl font-bold group-hover:text-primary transition">선발 투수 메타 &rarr;</h3>
-            <p class="mt-2 text-gray-500">이닝 소화 vs 실점 억제, 승률 분석</p>
+            <p class="mt-2 text-gray-500 dark:text-gray-400">이닝 소화 vs 실점 억제 승률 계산기</p>
         </a>
 
-        <a href="#" class="group block p-6 bg-white dark:bg-cardDark rounded-2xl shadow-sm hover:shadow-md transition border border-gray-100 dark:border-gray-700 opacity-60">
+        <a href="/analysis/relief-metrics/" class="group block p-8 bg-white dark:bg-cardDark rounded-3xl shadow-sm hover:shadow-lg hover:-translate-y-1 transition duration-300 border border-gray-100 dark:border-gray-700">
+            <div class="w-12 h-12 bg-red-100 dark:bg-red-900 rounded-2xl flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition">🔥</div>
+            <h3 class="text-xl font-bold group-hover:text-primary transition">불펜 투수 지표 &rarr;</h3>
+            <p class="mt-2 text-gray-500 dark:text-gray-400">gmLI(위기)와 WPA(승리)의 상관관계 분석</p>
+        </a>
+
+        <a href="/analysis/cost-effectiveness/" class="group block p-8 bg-white dark:bg-cardDark rounded-3xl shadow-sm hover:shadow-lg hover:-translate-y-1 transition duration-300 border border-gray-100 dark:border-gray-700">
+            <div class="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-2xl flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition">💰</div>
+            <h3 class="text-xl font-bold group-hover:text-primary transition">가성비 선수 지표 &rarr;</h3>
+            <p class="mt-2 text-gray-500 dark:text-gray-400">Dollars 가치 환산 및 Cost Per WAR 효율성 분석</p>
+        </a>
+
+        <a href="#" class="group block p-8 bg-gray-50 dark:bg-gray-800 rounded-3xl shadow-none border border-gray-100 dark:border-gray-700 opacity-60 cursor-not-allowed">
+            <div class="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-2xl flex items-center justify-center text-2xl mb-4">👀</div>
             <h3 class="text-xl font-bold">피치 터널 게임 (준비중)</h3>
-            <p class="mt-2 text-gray-500">타자의 시점에서 공을 바라보세요</p>
+            <p class="mt-2 text-gray-500 dark:text-gray-400">타자의 시점에서 공을 바라보세요</p>
         </a>
     </div>
 
