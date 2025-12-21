@@ -1,91 +1,201 @@
 {% extends 'core/base.html' %}
 
 {% block content %}
-<div class="space-y-10">
+<div class="space-y-8 animate-fade-in-up">
     
-    <div class="text-center space-y-4">
-        <h1 class="text-4xl font-bold text-gray-900 dark:text-white">강한 2번 타자 이론</h1>
-        <p class="text-lg text-gray-600 dark:text-gray-400">
-            전통적인 '작전 수행형' 2번 타자에서 '최고의 타자'를 배치하는 메타로의 변화를 분석합니다.
+    <div class="text-center space-y-2">
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">MLB 타순별 성적 분석</h1>
+        <p class="text-gray-600 dark:text-gray-400">
+            팀별, 타순별 OPS 흐름과 해당 포지션의 대표 선수를 분석합니다.
         </p>
     </div>
 
-    <div class="bg-cardLight dark:bg-cardDark rounded-2xl p-6 shadow-sm">
-        <h2 class="text-2xl font-semibold mb-4">연도별 2번 타자 OPS 추이</h2>
-        <div class="relative h-80 w-full">
-            <canvas id="opsChart"></canvas>
-        </div>
-        <p class="mt-4 text-sm text-gray-500 text-center">
-            * 현재는 가상 데이터 기반입니다.
-        </p>
-    </div>
+    <div class="bg-white dark:bg-cardDark p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-500 mb-1">연도 (Year)</label>
+                <select id="yearSelect" class="w-full p-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-none outline-none focus:ring-2 focus:ring-primary dark:text-white transition">
+                    </select>
+                <p class="text-xs text-gray-400 mt-1">* 차트는 전체 연도 흐름을 보여줍니다.</p>
+            </div>
 
-    <div class="bg-white dark:bg-cardDark rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-none">
-        <h2 class="text-2xl font-semibold mb-4">대표적인 강한 2번 타자들</h2>
-        <div class="overflow-x-auto">
-            <table class="w-full text-left">
-                <thead class="border-b dark:border-gray-600">
-                    <tr>
-                        <th class="py-3 px-4">선수명</th>
-                        <th class="py-3 px-4">팀</th>
-                        <th class="py-3 px-4">wRC+</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for player in data.top_players %}
-                    <tr class="border-b dark:border-gray-700 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-600 transition">
-                        <td class="py-3 px-4 font-medium">{{ player.name }}</td>
-                        <td class="py-3 px-4 text-gray-500 dark:text-gray-300">{{ player.team }}</td>
-                        <td class="py-3 px-4 text-primary font-bold">{{ player.wRC }}</td>
-                    </tr>
+            <div>
+                <label class="block text-sm font-medium text-gray-500 mb-1">팀 (Team)</label>
+                <select id="teamSelect" class="w-full p-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-none outline-none focus:ring-2 focus:ring-primary dark:text-white transition">
+                    </select>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-500 mb-1">타순 (Batting Order)</label>
+                <select id="orderSelect" class="w-full p-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-none outline-none focus:ring-2 focus:ring-primary dark:text-white transition">
+                    {% for i in "123456789" %}
+                        <option value="{{ i }}">{{ i }}번 타자</option>
                     {% endfor %}
-                </tbody>
-            </table>
+                </select>
+            </div>
         </div>
     </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <div class="lg:col-span-2 bg-white dark:bg-cardDark p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+            <h3 class="text-xl font-bold mb-4 flex items-center">
+                <span id="chartTitleTeam" class="text-primary mr-2">LAD</span> 
+                <span id="chartTitleOrder">2번 타자</span>
+                <span class="text-gray-500 ml-2 font-normal text-base">vs 리그 평균 OPS Trend</span>
+            </h3>
+            <div class="relative h-80 w-full">
+                <canvas id="trendChart"></canvas>
+            </div>
+        </div>
+
+        <div class="lg:col-span-1 bg-gradient-to-br from-blue-500 to-indigo-600 dark:from-gray-800 dark:to-black text-white p-6 rounded-2xl shadow-lg relative overflow-hidden">
+            <div class="absolute top-0 right-0 -mr-10 -mt-10 w-40 h-40 bg-white opacity-10 rounded-full blur-3xl"></div>
+            
+            <h4 class="text-sm font-medium opacity-80 mb-6">MOST FREQUENT PLAYER</h4>
+            
+            <div class="text-center space-y-4 z-10 relative">
+                <div class="inline-block p-4 bg-white/20 rounded-full mb-2">
+                    <span class="text-4xl">⚾️</span>
+                </div>
+                <div>
+                    <h2 id="playerYear" class="text-lg font-light opacity-90">2023</h2>
+                    <h1 id="playerName" class="text-3xl font-bold tracking-tight">선수 이름</h1>
+                    <p id="playerTeam" class="text-xl opacity-90 mt-1">Team</p>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4 mt-6 pt-6 border-t border-white/20">
+                    <div>
+                        <span class="block text-xs opacity-60">OPS</span>
+                        <span id="playerOps" class="text-2xl font-bold">0.000</span>
+                    </div>
+                    <div>
+                        <span class="block text-xs opacity-60">Games</span>
+                        <span id="playerGames" class="text-2xl font-bold">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 <script>
-    // Django에서 넘겨준 데이터 받기
-    const years = {{ data.years|safe }};
-    const ops2nd = {{ data.ops_2nd|safe }};
-    const opsAvg = {{ data.ops_avg|safe }};
+    // 1. Django 데이터 파싱
+    const mlbTeams = JSON.parse('{{ mlb_teams|safe }}');
+    const years = JSON.parse('{{ years|safe }}'); // [2016, ..., 2025]
+    const allData = JSON.parse('{{ all_data|safe }}');
+    const leagueAvgData = JSON.parse('{{ league_avg|safe }}');
 
-    // Chart.js 그리기
-    const ctx = document.getElementById('opsChart').getContext('2d');
-    new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: years,
-            datasets: [{
-                label: '2번 타자 평균 OPS',
-                data: ops2nd,
-                borderColor: '#007AFF', // Apple Blue
-                backgroundColor: 'rgba(0, 122, 255, 0.1)',
-                borderWidth: 3,
-                tension: 0.4, // 곡선 부드럽게
-                fill: true
-            },
-            {
-                label: '리그 평균 OPS',
-                data: opsAvg,
-                borderColor: '#8E8E93', // Gray
-                borderWidth: 2,
-                borderDash: [5, 5], // 점선
-                tension: 0.4,
-                fill: false
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { position: 'bottom' }
-            },
-            scales: {
-                y: { beginAtZero: false }
-            }
-        }
+    // 2. DOM 요소
+    const yearSelect = document.getElementById('yearSelect');
+    const teamSelect = document.getElementById('teamSelect');
+    const orderSelect = document.getElementById('orderSelect');
+    
+    // 3. 드롭다운 초기화
+    // 연도 채우기
+    years.forEach(y => {
+        const option = document.createElement('option');
+        option.value = y;
+        option.text = y;
+        yearSelect.appendChild(option);
     });
+    yearSelect.value = 2024; // 기본값
+
+    // 팀 채우기
+    mlbTeams.forEach(t => {
+        const option = document.createElement('option');
+        option.value = t;
+        option.text = t;
+        teamSelect.appendChild(option);
+    });
+    teamSelect.value = 'LAD'; // 기본값 다저스
+    orderSelect.value = '2';  // 기본값 2번타자
+
+    // 4. 차트 초기화
+    let trendChart = null;
+
+    function updateDashboard() {
+        const selectedYear = yearSelect.value;
+        const selectedTeam = teamSelect.value;
+        const selectedOrder = orderSelect.value;
+
+        // --- A. 차트 업데이트 (Trend) ---
+        // 차트는 '연도' 선택과 무관하게 2016~2025 전체를 보여줍니다.
+        const teamOpsTrend = years.map(y => allData[selectedTeam][y][selectedOrder].ops);
+        const leagueOpsTrend = years.map(y => leagueAvgData[y][selectedOrder]);
+
+        // 차트 제목 업데이트
+        document.getElementById('chartTitleTeam').innerText = selectedTeam;
+        document.getElementById('chartTitleOrder').innerText = selectedOrder + '번 타자';
+
+        const ctx = document.getElementById('trendChart').getContext('2d');
+        
+        if (trendChart) trendChart.destroy();
+
+        trendChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: years,
+                datasets: [
+                    {
+                        label: `${selectedTeam} ${selectedOrder}번 타자`,
+                        data: teamOpsTrend,
+                        borderColor: '#3B82F6', // Blue
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderWidth: 3,
+                        tension: 0.3,
+                        fill: true
+                    },
+                    {
+                        label: `리그 평균 ${selectedOrder}번 타자`,
+                        data: leagueOpsTrend,
+                        borderColor: '#9CA3AF', // Gray
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        tension: 0.3,
+                        fill: false
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom' },
+                    tooltip: { mode: 'index', intersect: false }
+                },
+                scales: {
+                    y: { 
+                        min: 0.400, 
+                        grid: { color: document.documentElement.classList.contains('dark') ? '#374151' : '#E5E7EB' }
+                    },
+                    x: {
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+
+        // --- B. 선수 카드 업데이트 (Specific Year) ---
+        // 여기는 선택한 '연도'에 맞는 데이터를 가져옵니다.
+        const playerData = allData[selectedTeam][selectedYear][selectedOrder];
+        
+        document.getElementById('playerYear').innerText = selectedYear;
+        document.getElementById('playerName').innerText = playerData.player_name;
+        document.getElementById('playerTeam').innerText = selectedTeam + " #" + selectedOrder;
+        document.getElementById('playerOps').innerText = playerData.ops.toFixed(3);
+        document.getElementById('playerGames').innerText = playerData.games;
+    }
+
+    // 5. 이벤트 리스너 등록
+    yearSelect.addEventListener('change', updateDashboard);
+    teamSelect.addEventListener('change', updateDashboard);
+    orderSelect.addEventListener('change', updateDashboard);
+
+    // 초기 실행
+    updateDashboard();
+
 </script>
 {% endblock %}

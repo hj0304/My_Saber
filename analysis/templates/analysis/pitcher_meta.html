@@ -65,9 +65,51 @@
         <strong>💡 Insight:</strong>
         <span id="insight-text">데이터를 선택하여 비교 결과를 확인하세요.</span>
     </div>
+    
+<div class="mt-12 bg-white dark:bg-cardDark p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+        <h3 class="text-xl font-bold mb-2">승리 확률 매트릭스 (Win Probability Matrix)</h3>
+        <p class="text-sm text-gray-500 mb-6">
+            선발 투수의 이닝과 실점에 따른 팀의 기대 승률입니다. (범위: 3~9이닝, 0~7실점)
+        </p>
 
+        <div class="overflow-x-auto">
+            <table class="w-full text-center border-collapse">
+                <thead>
+                    <tr>
+                        <th class="p-2 text-sm text-gray-400 font-medium">IP \ Runs</th>
+                        {% for i in "01234567" %}
+                        <th class="p-2 text-sm font-semibold text-gray-700 dark:text-gray-300">{{ i }}점</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                
+                <tbody>
+                    {% for row in heatmap_rows %}
+                    <tr>
+                        <td class="p-2 font-bold text-gray-700 dark:text-gray-300 border-r dark:border-gray-700">{{ row.ip }}이닝</td>
+                        
+                        {% for col in row.cols %}
+                        <td class="p-1">
+                            <div class="rounded-lg py-3 px-1 transition hover:scale-105 cursor-default shadow-sm"
+                                 style="background-color: rgba(59, 130, 246, {{ col.opacity }}); 
+                                        color: {% if col.win_rate > 50 %} white {% else %} #1f2937 {% endif %};">
+                                <span class="text-sm font-bold">{{ col.win_rate }}%</span>
+                            </div>
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="mt-4 flex justify-end items-center space-x-2 text-xs text-gray-500">
+            <span>Low Win %</span>
+            <div class="w-24 h-2 rounded-full bg-gradient-to-r from-white to-blue-500 border border-gray-200"></div>
+            <span>High Win %</span>
+        </div>
+    </div>
 </div>
-
 <script>
     // 1. Django에서 보낸 데이터 받기
     const matrixData = JSON.parse('{{ matrix_json|safe }}');
