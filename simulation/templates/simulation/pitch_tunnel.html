@@ -1,0 +1,433 @@
+{% extends 'core/base.html' %}
+
+{% block content %}
+<div class="relative w-full h-[calc(100vh-120px)] mt-4 bg-black rounded-3xl overflow-hidden shadow-2xl select-none group">
+    
+    <div id="canvas-container" class="w-full h-full outline-none"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
+
+    <div id="ui-layer" class="absolute inset-0 pointer-events-none font-sans">
+        
+        <div class="absolute top-6 left-6 flex flex-col space-y-1">
+            <div class="flex bg-black/90 text-white rounded-lg overflow-hidden shadow-2xl border-b-2 border-red-600 w-fit">
+                <div class="px-4 py-2 bg-red-700 font-black text-lg tracking-tighter">STATCAST</div>
+                <div class="px-5 py-2 text-md font-bold flex items-center space-x-3">
+                    <span class="text-gray-400 text-xs">PITCHER</span>
+                    <span id="pitcher-name" class="uppercase">LOADING...</span>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2">
+                <span id="pitcher-hand" class="bg-gray-800 text-gray-300 text-[10px] font-bold px-2 py-0.5 rounded border border-gray-600">
+                    -
+                </span>
+            </div>
+        </div>
+
+        <div class="absolute top-6 right-6 pointer-events-auto flex flex-col items-end space-y-3">
+            <div class="bg-black/80 backdrop-blur-md p-3 rounded-xl border border-gray-700 shadow-xl">
+                <div class="text-[10px] text-gray-400 font-bold mb-1 uppercase tracking-wider">Batter Hand</div>
+                <div class="flex space-x-1">
+                    <button onclick="setBatter('L')" id="btn-L" class="px-3 py-1 bg-gray-700 hover:bg-blue-600 text-white text-xs font-bold rounded transition">L</button>
+                    <button onclick="setBatter('R')" id="btn-R" class="px-3 py-1 bg-blue-600 text-white text-xs font-bold rounded transition">R</button>
+                </div>
+            </div>
+            <div class="bg-black/80 backdrop-blur-md p-3 rounded-xl border border-gray-700 shadow-xl w-48">
+                <div class="flex justify-between mb-1">
+                    <span class="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Sim Speed</span>
+                    <span id="speed-val" class="text-[10px] text-yellow-400 font-bold">0.4x</span>
+                </div>
+                <input type="range" id="speed-slider" min="0.1" max="1.5" step="0.1" value="0.4" 
+                       class="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-yellow-400">
+            </div>
+        </div>
+
+        <div class="absolute bottom-10 right-10 flex items-end space-x-4">
+            <div class="relative bg-black/80 backdrop-blur-md rounded-lg border-2 border-gray-600 shadow-2xl w-[140px] h-[170px]">
+                <div class="absolute top-[15%] left-[15%] w-[70%] h-[70%] border-2 border-white/90 box-border bg-white/5"></div>
+                <div class="absolute top-[38.3%] left-[15%] w-[70%] h-px bg-white/20"></div>
+                <div class="absolute top-[61.6%] left-[15%] w-[70%] h-px bg-white/20"></div>
+                <div class="absolute left-[38.3%] top-[15%] h-[70%] w-px bg-white/20"></div>
+                <div class="absolute left-[61.6%] top-[15%] h-[70%] w-px bg-white/20"></div>
+                <div id="zone-dot" class="absolute w-3.5 h-3.5 rounded-full border border-white shadow-md hidden transform -translate-x-1/2 -translate-y-1/2 z-20 transition-all duration-200"></div>
+                <div class="absolute bottom-1 left-0 w-full text-center text-[9px] text-gray-500 font-mono tracking-widest">CATCHER VIEW</div>
+            </div>
+            <div class="space-y-2 text-right">
+                <div class="bg-black/80 backdrop-blur-md p-5 rounded-2xl border-r-4 border-yellow-400 shadow-xl min-w-[160px]">
+                    <div class="text-[10px] text-gray-400 font-bold tracking-widest uppercase mb-1">Velocity</div>
+                    <div class="text-5xl font-black text-white tracking-tighter" id="ui-speed">--</div>
+                    <div class="text-lg text-yellow-400 font-bold mt-1" id="ui-type">Ready</div>
+                </div>
+                <div class="flex flex-col items-end space-y-1">
+                    <div class="bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg text-white text-xs border-r-2 border-blue-500 w-32 flex justify-between">
+                        <span class="text-gray-400">Height</span> <span id="ui-height" class="font-bold">-</span>
+                    </div>
+                    <div class="bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg text-white text-xs border-r-2 border-green-500 w-32 flex justify-between">
+                        <span class="text-gray-400">Spin</span> <span id="ui-spin" class="font-bold">-</span>
+                    </div>
+                    <div class="bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg text-white text-xs border-r-2 border-purple-500 w-32 flex justify-between">
+                        <span class="text-gray-400">Break</span> <span id="ui-break" class="font-bold">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="center-msg" class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center opacity-0 transition-opacity duration-300 pointer-events-none flex flex-col items-center">
+            <h1 id="msg-text" class="text-8xl font-black text-white italic drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]">STRIKE</h1>
+            
+            <div id="timing-feedback" class="mt-2 px-4 py-1 rounded-full text-xl font-bold bg-black/60 backdrop-blur text-white hidden border border-white/30">
+                Perfect
+            </div>
+
+            <p id="next-msg" class="text-sm font-mono text-gray-300 mt-4 bg-black/50 px-3 py-1 rounded hidden">Press <span class="text-yellow-400 font-bold">SPACE</span> for Next Pitch</p>
+        </div>
+    </div>
+
+    <div id="start-overlay" class="absolute inset-0 flex items-center justify-center bg-black/90 z-50 cursor-pointer">
+        <div class="text-center group-hover:scale-105 transition duration-300">
+            <div class="text-6xl mb-4 animate-bounce">⚾️</div>
+            <h1 class="text-4xl font-bold text-white mb-2">STATCAST 3D MODE</h1>
+            <p class="text-gray-400 font-mono text-sm">
+                <span class="text-yellow-400 font-bold border border-yellow-400 px-2 rounded">A</span> Pitch/Swing &nbsp;|&nbsp; 
+                <span class="text-white font-bold border border-white px-2 rounded">SPACE</span> Next
+            </p>
+        </div>
+    </div>
+</div>
+
+<script>
+    const rawPitchData = JSON.parse('{{ pitch_data|safe }}');
+    const pitchData = rawPitchData.length > 0 ? rawPitchData : null;
+
+    const container = document.getElementById('canvas-container');
+    const startOverlay = document.getElementById('start-overlay');
+    
+    // UI Elements
+    const pitcherNameEl = document.getElementById('pitcher-name');
+    const pitcherHandEl = document.getElementById('pitcher-hand');
+    const uiSpeed = document.getElementById('ui-speed');
+    const uiType = document.getElementById('ui-type');
+    const uiHeight = document.getElementById('ui-height');
+    const uiSpin = document.getElementById('ui-spin');
+    const uiBreak = document.getElementById('ui-break');
+    const zoneDot = document.getElementById('zone-dot');
+    const centerMsg = document.getElementById('center-msg');
+    const msgText = document.getElementById('msg-text');
+    const timingMsg = document.getElementById('timing-feedback'); // [New]
+    const nextMsg = document.getElementById('next-msg'); 
+    const speedSlider = document.getElementById('speed-slider');
+    const speedVal = document.getElementById('speed-val');
+
+    const STATE = { READY: 0, PITCHING: 1, RESULT: 2 };
+    let currentState = STATE.READY;
+    let pitchStartTime = 0;
+    let currentPitch = null;
+    let SIM_SPEED = 0.4;
+    let isLefty = false; 
+    let isGameActive = false; 
+
+    // Three.js Setup
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a1a2e); 
+    scene.fog = new THREE.FogExp2(0x1a1a2e, 0.02);
+
+    const camera = new THREE.PerspectiveCamera(40, container.clientWidth / container.clientHeight, 0.1, 100);
+    camera.position.set(0, 1.5, 4.0); 
+    const lookTarget = new THREE.Vector3(0, 1.0, -18.44);
+    camera.lookAt(lookTarget);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    container.innerHTML = '';
+    container.appendChild(renderer.domElement);
+
+    // Light & Objects
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambientLight);
+    const spotLight = new THREE.SpotLight(0x4488ff, 2.0);
+    spotLight.position.set(-5, 10, 5); spotLight.castShadow = true; scene.add(spotLight);
+    const rimLight = new THREE.SpotLight(0xff0055, 1.5);
+    rimLight.position.set(5, 10, -5); scene.add(rimLight);
+
+    const gridHelper = new THREE.GridHelper(40, 40, 0x333333, 0x111111);
+    gridHelper.position.set(0, 0, -10); scene.add(gridHelper);
+    
+    const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.43, 0.43), new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide }));
+    plate.rotation.x = -Math.PI / 2; plate.rotation.z = Math.PI / 4; plate.position.y = 0.01;
+    scene.add(plate);
+
+    const zoneGeo = new THREE.BoxGeometry(0.43, 0.6, 0.01);
+    const zoneMat = new THREE.LineBasicMaterial({ color: 0xffff00, linewidth: 2, transparent: true, opacity: 0.5 });
+    const zoneBox = new THREE.LineSegments(new THREE.EdgesGeometry(zoneGeo), zoneMat);
+    zoneBox.position.set(0, 1.0, -0.2); scene.add(zoneBox);
+
+    const ball = new THREE.Mesh(new THREE.SphereGeometry(0.04, 32, 32), new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xaaaaaa, emissiveIntensity: 0.2 }));
+    scene.add(ball);
+
+    const trailMax = 400;
+    const trailLine = new THREE.Line(new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(trailMax*3), 3)), new THREE.LineBasicMaterial({ color: 0x00ffff, linewidth: 3 }));
+    scene.add(trailLine);
+    let trailCount = 0;
+
+    const batObj = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.02, 0.9, 16), new THREE.MeshStandardMaterial({ color: 0xd2691e, roughness: 0.3 }));
+    batObj.position.set(-0.4, 1.0, 0); 
+    scene.add(batObj);
+
+    // Controls
+    window.setBatter = function(hand) {
+        isLefty = (hand === 'L');
+        const btnL = document.getElementById('btn-L');
+        const btnR = document.getElementById('btn-R');
+        if (isLefty) {
+            btnL.className = "px-3 py-1 bg-blue-600 text-white text-xs font-bold rounded transition shadow-lg ring-1 ring-white";
+            btnR.className = "px-3 py-1 bg-gray-700 hover:bg-blue-600 text-white text-xs font-bold rounded transition opacity-50";
+            batObj.position.set(0.4, 1.0, 0); 
+        } else {
+            btnL.className = "px-3 py-1 bg-gray-700 hover:bg-blue-600 text-white text-xs font-bold rounded transition opacity-50";
+            btnR.className = "px-3 py-1 bg-blue-600 text-white text-xs font-bold rounded transition shadow-lg ring-1 ring-white";
+            batObj.position.set(-0.4, 1.0, 0);
+        }
+        resetGame();
+    };
+
+    speedSlider.addEventListener('input', (e) => {
+        SIM_SPEED = parseFloat(e.target.value);
+        speedVal.innerText = SIM_SPEED.toFixed(1) + "x";
+    });
+
+    startOverlay.addEventListener('click', () => {
+        startOverlay.style.display = 'none';
+        isGameActive = true; 
+        window.setBatter('R'); 
+        resetGame(); 
+    });
+
+    function resetGame() {
+        currentState = STATE.READY;
+        ball.visible = false; trailLine.visible = false; trailCount = 0;
+        
+        centerMsg.style.opacity = '0';
+        nextMsg.classList.add('hidden'); 
+        zoneDot.classList.add('hidden');
+        timingMsg.classList.add('hidden'); // 타이밍 숨김
+        
+        uiType.innerText = "Ready"; uiType.style.color = "#fbbf24"; 
+        uiSpeed.innerText = "--";
+        uiHeight.innerText = "-"; uiSpin.innerText = "-"; uiBreak.innerText = "-";
+
+        const batX = isLefty ? 0.4 : -0.4;
+        batObj.position.set(batX, 1.1, 0.3);
+        batObj.rotation.set(0, 0, isLefty ? -0.3 : 0.3);
+        camera.position.set(0, 1.5, 4.0);
+        
+        // 스윙 상태 리셋
+        isSwinging = false;
+        hasSwung = false;
+        swingProgress = 0;
+    }
+
+    function preparePitch() {
+        if (!pitchData) return;
+        currentPitch = pitchData[Math.floor(Math.random() * pitchData.length)];
+        
+        const pName = currentPitch.player_name || "Unknown Pitcher";
+        const pHand = currentPitch.p_throws === 'L' ? "LHP (Left)" : "RHP (Right)";
+        pitcherNameEl.innerText = pName;
+        pitcherHandEl.innerText = pHand;
+
+        uiType.innerText = "Incoming...";
+        uiType.style.color = "#9ca3af"; 
+
+        const szTop = (currentPitch.sz_top * 0.3048) || 1.06;
+        const szBot = (currentPitch.sz_bot * 0.3048) || 0.45;
+        const szHeight = szTop - szBot;
+        const szCenterY = (szTop + szBot) / 2;
+        zoneBox.scale.y = szHeight / 0.6;
+        zoneBox.position.y = szCenterY;
+
+        throwBall();
+    }
+
+    function throwBall() {
+        const FT = 0.3048;
+        ball.position.set(currentPitch.release_pos_x * FT, currentPitch.release_pos_z * FT, -(currentPitch.release_pos_y * FT) + 1.4);
+        ball.visible = true; trailLine.visible = true;
+        pitchStartTime = performance.now();
+        currentState = STATE.PITCHING;
+    }
+
+    function finishPitch(x, y) {
+        if (currentState !== STATE.PITCHING) return;
+        currentState = STATE.RESULT;
+
+        const szTop = (currentPitch.sz_top * 0.3048) || 1.06;
+        const szBot = (currentPitch.sz_bot * 0.3048) || 0.45;
+        const width = 0.22;
+        const isStrike = (x > -width && x < width && y > szBot && y < szTop);
+
+        msgText.innerText = isStrike ? "STRIKE" : "BALL";
+        msgText.style.color = isStrike ? "#ff0055" : "#00ddff";
+        centerMsg.style.opacity = '1';
+        
+        // [추가] 헛스윙(Miss) 시 타이밍 피드백
+        if (!timingMsg.classList.contains('hidden')) {
+            // 이미 hitBall에서 피드백 줬으면 패스
+        } else if (hasSwung) {
+            // 휘둘렀는데 못 맞춤
+            timingMsg.classList.remove('hidden');
+            if (swingProgress >= 1.0) {
+                timingMsg.innerText = "Too Early";
+                timingMsg.style.color = "#ef4444"; // Red
+            } else {
+                timingMsg.innerText = "Too Late";
+                timingMsg.style.color = "#ef4444"; // Red
+            }
+        } else {
+            // 안 휘두름
+            timingMsg.classList.remove('hidden');
+            timingMsg.innerText = "Looking";
+            timingMsg.style.color = "#9ca3af"; // Gray
+        }
+
+        uiSpeed.innerText = currentPitch.release_speed;
+        uiType.innerText = currentPitch.pitch_type || "Pitch";
+        uiType.style.color = "#fbbf24"; 
+        uiHeight.innerText = currentPitch.release_pos_z ? currentPitch.release_pos_z.toFixed(2) + " ft" : "-";
+        uiSpin.innerText = currentPitch.release_spin_rate ? Math.round(currentPitch.release_spin_rate) + " rpm" : "-";
+        uiBreak.innerText = currentPitch.pfx_z ? (currentPitch.pfx_z * 12).toFixed(1) + " in" : "-";
+
+        nextMsg.classList.remove('hidden'); 
+        updateZoneUI(false, x, y, isStrike);
+    }
+
+    function updatePhysics(now) {
+        const FT = 0.3048;
+        const t = ((now - pitchStartTime) / 1000) * SIM_SPEED;
+        const nx = (currentPitch.release_pos_x * FT) + (currentPitch.vx0 * FT)*t + 0.5*(currentPitch.ax * FT)*t*t;
+        const ny = (currentPitch.release_pos_z * FT) + (currentPitch.vz0 * FT)*t + 0.5*(currentPitch.az * FT)*t*t;
+        const nz = (-(currentPitch.release_pos_y * FT) + 1.4) + (-(currentPitch.vy0 * FT))*t + 0.5*(-(currentPitch.ay * FT))*t*t;
+
+        ball.position.set(nx, ny, nz);
+
+        if(trailCount < trailMax) {
+            const arr = trailLine.geometry.attributes.position.array;
+            arr[trailCount*3] = nx; arr[trailCount*3+1] = ny; arr[trailCount*3+2] = nz;
+            trailLine.geometry.setDrawRange(0, ++trailCount);
+            trailLine.geometry.attributes.position.needsUpdate = true;
+        }
+        
+        // 홈플레이트 앞면 통과 시점 (-0.4m)
+        if (nz > -0.4) finishPitch(nx, ny);
+    }
+
+    let isSwinging = false; 
+    let hasSwung = false; // [New] 휘둘렀는지 여부
+    let swingStart = 0;
+    let swingProgress = 0; // [New] 스윙 진행도 (0~1)
+
+    function swingBat() { 
+        if (isSwinging || currentState !== STATE.PITCHING) return; 
+        isSwinging = true; 
+        hasSwung = true; 
+        swingStart = performance.now(); 
+    }
+
+    function updateBat() {
+        if (!isSwinging) return;
+        const t = ((performance.now() - swingStart) / 200) * SIM_SPEED * 2.5; 
+        swingProgress = t; // 진행도 저장
+
+        const dir = isLefty ? 1 : -1; 
+        const baseX = isLefty ? 0.4 : -0.4;
+
+        if (t < 1.0) {
+            batObj.rotation.y = -(Math.PI/2 * dir) + (t * Math.PI * dir); 
+            batObj.position.x = baseX - (t * 0.8 * dir);
+        } else { isSwinging = false; }
+        
+        // Contact Check
+        if (currentState === STATE.PITCHING && ball.position.z > -0.5 && ball.position.z < 0.5) {
+            hitBall();
+        }
+    }
+
+    function hitBall() {
+        currentState = STATE.RESULT;
+        ball.visible = false;
+        msgText.innerText = "HIT!"; msgText.style.color = "#00ff00"; centerMsg.style.opacity = '1';
+        
+        // [추가] 타격 타이밍 판정
+        const bz = ball.position.z; 
+        let timingText = "Good";
+        let timingColor = "#4ade80"; // Green
+
+        if (bz < -0.3) {
+            timingText = "Early"; timingColor = "#fbbf24"; // Yellow
+        } else if (bz > 0.0) {
+            timingText = "Late"; timingColor = "#fbbf24"; // Yellow
+        } else {
+            timingText = "Perfect"; timingColor = "#00ff00"; // Bright Green
+        }
+
+        timingMsg.innerText = timingText;
+        timingMsg.style.color = timingColor;
+        timingMsg.classList.remove('hidden');
+
+        nextMsg.classList.remove('hidden'); 
+        updateZoneUI(true);
+    }
+
+    function updateZoneUI(isHit, ballX, ballY, isStrike) {
+        let px = currentPitch.plate_x; 
+        let pz = currentPitch.plate_z; 
+
+        const zoneWidthFt = 1.416; 
+        const uiFullWidthFt = 2.2125;
+        const uiX = 50 + (px / uiFullWidthFt) * 100;
+
+        const szTop = currentPitch.sz_top || 3.5;
+        const szBot = currentPitch.sz_bot || 1.5;
+        const centerH = (szTop + szBot) / 2;
+        const zoneHeight = szTop - szBot;
+        const uiFullHeightFt = zoneHeight / 0.64; 
+        const uiY = 50 - ((pz - centerH) / uiFullHeightFt) * 100;
+
+        zoneDot.style.left = `${uiX}%`;
+        zoneDot.style.top = `${uiY}%`;
+        zoneDot.style.backgroundColor = isHit ? '#3b82f6' : (isStrike ? '#ef4444' : '#22c55e');
+        zoneDot.classList.remove('hidden');
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        const now = performance.now();
+        if (currentState === STATE.PITCHING) updatePhysics(now);
+        updateBat();
+        if (!isSwinging && currentState !== STATE.RESULT) batObj.position.y = 1.1 + Math.sin(now / 300) * 0.02;
+        renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('keydown', (e) => {
+        if (!isGameActive) return; 
+
+        if (e.code === 'KeyA') {
+            e.preventDefault();
+            if (currentState === STATE.READY) preparePitch();
+            else if (currentState === STATE.PITCHING) swingBat();
+        }
+        if (e.code === 'Space') {
+            e.preventDefault();
+            if (currentState === STATE.RESULT) resetGame();
+        }
+    });
+
+    window.addEventListener('resize', () => {
+        camera.aspect = container.clientWidth / container.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(container.clientWidth, container.clientHeight);
+    });
+</script>
+{% endblock %}
