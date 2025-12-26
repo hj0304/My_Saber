@@ -18,3 +18,5 @@ env/
 # IDE 설정 파일 (VSCode, Pycharm 등)
 .idea/
 .vscode/
+
+simulation/data/*.csv
