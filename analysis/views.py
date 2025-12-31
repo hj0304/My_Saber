@@ -2,6 +2,10 @@
 from django.shortcuts import render
 import json
 import random
+# Sample size를 위한
+import math
+import pandas as pd
+import os
 
 # ------------------------------------------------------------------------------------------------------------------------
 # 강한 2번 타자
@@ -257,3 +261,63 @@ def cost_effectiveness_view(request):
     }
     
     return render(request, 'analysis/cost_effectiveness.html', context)
+
+
+# ------------------------------------------------------------------------------------------------------------------------
+# 샘플 사이즈와 신뢰도
+def sample_size_view(request):
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    # 파일명 v2로 변경 확인!
+    csv_path = os.path.join(base_dir, 'data_science', 'stabilization_results_v2.csv')
+
+    context = {}
+    if os.path.exists(csv_path):
+        df = pd.read_csv(csv_path)
+        # JSON 변환
+        context['chart_data'] = json.dumps(df.to_dict(orient='records'))
+        context['data_exists'] = True
+    else:
+        context['data_exists'] = False
+
+    return render(request, 'analysis/sample_size.html', context)
+    # 차트 데이터 생성 함수
+    def generate_chart_data(stat_list, max_range):
+        datasets = []
+        x_values = list(range(0, max_range + 1, 50)) # 0 ~ Max까지 50단위
+
+        for stat in stat_list:
+            data_points = []
+            k = stat['threshold']
+            
+            for x in x_values:
+                if x == 0:
+                    y = 0
+                else:
+                    # 신뢰도 곡선 시뮬레이션 (x=k일 때 0.7(R^2=0.5) 수준 도달 가정)
+                    # 수식: Reliability = x / (x + k * 0.4) -> 단순화된 모델
+                    # 설명: 표본(x)이 임계값(k)만큼 쌓이면 꽤 높은 신뢰도를 보임
+                    ratio = x / k
+                    # 시각적으로 예쁜 Log-like Curve
+                    reliability = 1 - (1 / (1 + 0.8 * ratio + 0.2 * (ratio**2)))
+                    data_points.append(round(min(reliability, 1.0), 3))
+            
+            datasets.append({
+                'label': stat['name'],
+                'data': data_points,
+                'borderColor': stat['color'],
+                'threshold': stat['threshold']
+            })
+        return x_values, datasets
+
+    # 각각 데이터 생성
+    # 타자는 600 PA, 투수는 600 BF 정도까지 보여줌
+    x_batter, data_batter = generate_chart_data(batter_stats, 700)
+    x_pitcher, data_pitcher = generate_chart_data(pitcher_stats, 700)
+
+    context = {
+        # JSON으로 변환하여 템플릿에 전달
+        'batter_data': json.dumps({'labels': x_batter, 'datasets': data_batter}),
+        'pitcher_data': json.dumps({'labels': x_pitcher, 'datasets': data_pitcher})
+    }
+    
+    return render(request, 'analysis/sample_size.html', context)

@@ -1,0 +1,282 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="text-center space-y-2">
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
+            📊 스탯 안정화 시점 <span class="text-primary text-xl block sm:inline">(Stabilization Point)</span>
+        </h1>
+        <p class="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+            MLB Statcast(2016-2025) 실제 데이터를 분석하여, 각 스탯이 '진짜 실력'을 나타내기 위해 필요한 샘플 사이즈를 도출했습니다.<br>
+            <span class="text-sm text-gray-500">* 상관계수(Correlation) <strong class="text-primary">0.7 이상</strong>이면 신뢰할 수 있는 구간으로 간주합니다.</span>
+        </p>
+    </div>
+
+    <div class="bg-cardLight dark:bg-cardDark rounded-2xl p-6 shadow-sm border border-gray-200 dark:border-gray-700 transition-colors">
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+            
+            <div class="md:col-span-3 space-y-2">
+                <label for="categorySelect" class="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                    분석 대상 (Category)
+                </label>
+                <div class="relative">
+                    <select id="categorySelect" class="w-full bg-white dark:bg-darkBg text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded-lg py-2.5 px-3 focus:ring-2 focus:ring-primary focus:border-primary appearance-none transition-colors">
+                        <option value="Offense">⚾ 타자 (Offense)</option>
+                        <option value="Pitching">🧢 투수 (Pitching)</option>
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500 dark:text-gray-400">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="md:col-span-9 space-y-2">
+                <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                    표시할 스탯 선택 (Display Metrics)
+                </label>
+                <div id="statsContainer" class="flex flex-wrap gap-2">
+                    </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white dark:bg-cardDark rounded-2xl p-4 sm:p-6 shadow-lg border border-gray-200 dark:border-gray-700 relative transition-colors">
+        <div class="relative h-[400px] w-full">
+            <canvas id="reliabilityChart"></canvas>
+        </div>
+        <div class="absolute bottom-4 right-6 text-gray-300 dark:text-gray-600 text-xs font-mono pointer-events-none select-none">
+            Powered by My Saber
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl p-5">
+            <h3 class="text-lg font-bold text-blue-800 dark:text-blue-300 mb-2">
+                🚀 빠르게 안정화되는 스탯 (Quick Stabilizers)
+            </h3>
+            <ul class="list-disc list-inside text-sm text-gray-700 dark:text-gray-300 space-y-1">
+                <li><strong>Swing%, Contact%:</strong> 50~100 타석이면 선수의 성향 파악 가능</li>
+                <li><strong>K% (삼진율):</strong> 약 60 타석 (매우 빠르게 본색을 드러냄)</li>
+                <li><strong>K/BB (볼삼비):</strong> 투수의 경우 가장 신뢰할 수 있는 초기 지표</li>
+            </ul>
+        </div>
+        <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-100 dark:border-yellow-800 rounded-xl p-5">
+            <h3 class="text-lg font-bold text-yellow-800 dark:text-yellow-300 mb-2">
+                🐢 느리게 안정화되는 스탯 (Slow Stabilizers)
+            </h3>
+            <ul class="list-disc list-inside text-sm text-gray-700 dark:text-gray-300 space-y-1">
+                <li><strong>AVG (타율):</strong> 약 900 타석 필요 (한 시즌 데이터로도 부족함)</li>
+                <li><strong>BABIP:</strong> 운의 요소가 가장 큼, 매우 긴 시간 필요</li>
+                <li><strong>OBP (출루율):</strong> 타율보다는 빠르지만 여전히 많은 타석 필요</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 1. Django에서 데이터 받기
+    const rawData = JSON.parse('{{ chart_data|escapejs }}');
+    
+    // 차트 인스턴스 전역 변수
+    let myChart = null;
+
+    // 색상 팔레트 (다크모드에서도 잘 보이는 색상 선정)
+    const colorPalette = {
+        'red': 'rgb(239, 68, 68)',    // K%, HR
+        'blue': 'rgb(59, 130, 246)',   // BB%, Walk
+        'green': 'rgb(34, 197, 94)',   // AVG, Contact
+        'yellow': 'rgb(234, 179, 8)',  // OBP
+        'purple': 'rgb(168, 85, 247)', // SLG, ISO
+        'orange': 'rgb(249, 115, 22)', // Swing
+        'teal': 'rgb(20, 184, 166)',   // GB, FB
+        'gray': 'rgb(107, 114, 128)'   // etc
+    };
+
+    // 스탯별 기본 색상 매핑
+    const statColors = {
+        'Strikeout Rate': colorPalette.red, 'K/PA': colorPalette.red,
+        'Walk Rate': colorPalette.blue, 'BB/PA': colorPalette.blue,
+        'AVG': colorPalette.green, 'Contact%': colorPalette.green,
+        'OBP': colorPalette.yellow,
+        'SLG': colorPalette.purple, 'ISO': colorPalette.purple,
+        'Home Run Rate': colorPalette.red, 'HR/PA': colorPalette.red,
+        'Swing%': colorPalette.orange,
+        'Ground Ball%': colorPalette.teal, 'GB%': colorPalette.teal
+    };
+
+    // 초기 설정 (Offense)
+    const defaultStats = ['K-Rate', 'BB-Rate', 'AVG', 'OBP', 'SLG']; 
+    // 실제 데이터의 stat 이름과 매칭 필요 (공백/특수문자 처리)
+
+    // DOM 요소
+    const categorySelect = document.getElementById('categorySelect');
+    const statsContainer = document.getElementById('statsContainer');
+    const ctx = document.getElementById('reliabilityChart').getContext('2d');
+
+    // --------------------------------------------
+    // 함수: 스탯 체크박스 생성기
+    // --------------------------------------------
+    function renderStatToggles(category) {
+        statsContainer.innerHTML = '';
+        
+        // 해당 카테고리에 있는 모든 스탯 추출
+        const availableStats = [...new Set(rawData
+            .filter(d => d.category === category)
+            .map(d => d.stat)
+        )].sort();
+
+        availableStats.forEach(stat => {
+            // 버튼형 체크박스 생성 (Tailwind 스타일)
+            const label = document.createElement('label');
+            label.className = `cursor-pointer select-none inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium border transition-all duration-200 
+                border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 
+                hover:bg-gray-100 dark:hover:bg-gray-700
+                has-[:checked]:bg-primary/10 has-[:checked]:text-primary has-[:checked]:border-primary`;
+            
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.value = stat;
+            checkbox.className = 'hidden'; // 실제 체크박스는 숨김
+            
+            // 기본 선택값 설정 (주요 스탯만 처음에 켜두기)
+            const majorStats = ['Strikeout Rate', 'Walk Rate', 'AVG', 'OPS', 'K/PA', 'BB/PA'];
+            if (majorStats.includes(stat)) checkbox.checked = true;
+
+            checkbox.addEventListener('change', updateChart); // 클릭 시 차트 업데이트
+
+            label.appendChild(checkbox);
+            label.appendChild(document.createTextNode(stat));
+            statsContainer.appendChild(label);
+        });
+        
+        updateChart(); // 초기 차트 그리기
+    }
+
+    // --------------------------------------------
+    // 함수: 차트 그리기
+    // --------------------------------------------
+    function updateChart() {
+        const category = categorySelect.value;
+        
+        // 1. 체크된 스탯들 확인
+        const checkedStats = Array.from(statsContainer.querySelectorAll('input:checked')).map(cb => cb.value);
+        
+        if (checkedStats.length === 0) {
+            if (myChart) myChart.destroy();
+            return;
+        }
+
+        // 2. 데이터 필터링
+        const filteredData = rawData.filter(d => d.category === category && checkedStats.includes(d.stat));
+        
+        // 3. X축 라벨 (PA) 추출
+        const labels = [...new Set(filteredData.map(d => d.pa))].sort((a,b) => a-b);
+
+        // 4. 데이터셋 구성
+        const datasets = checkedStats.map(statName => {
+            const dataPoints = labels.map(label => {
+                const found = filteredData.find(d => d.stat === statName && d.pa === label);
+                return found ? found.correlation : null;
+            });
+
+            const color = statColors[statName] || colorPalette.gray;
+
+            return {
+                label: statName,
+                data: dataPoints,
+                borderColor: color,
+                backgroundColor: color,
+                borderWidth: 2,
+                pointRadius: 3,
+                pointHoverRadius: 6,
+                tension: 0.3, // 부드러운 곡선
+                fill: false
+            };
+        });
+
+        // 5. 기준선 (0.7) 추가
+        datasets.push({
+            label: '안정화 기준 (0.7)',
+            data: labels.map(() => 0.7),
+            borderColor: 'rgba(156, 163, 175, 0.5)', // Gray-400
+            borderDash: [5, 5],
+            pointRadius: 0,
+            borderWidth: 1.5,
+            fill: false
+        });
+
+        // 6. 다크모드 감지 (Tailwind dark 클래스 확인)
+        const isDark = document.documentElement.classList.contains('dark');
+        const textColor = isDark ? '#e5e7eb' : '#374151'; // gray-200 : gray-700
+        const gridColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
+
+        // 차트 생성/갱신
+        if (myChart) myChart.destroy();
+
+        myChart = new Chart(ctx, {
+            type: 'line',
+            data: { labels: labels, datasets: datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                scales: {
+                    x: {
+                        title: { display: true, text: category === 'Offense' ? '타석 수 (PA)' : '타자 상대 수 (BF)', color: textColor },
+                        ticks: { color: textColor },
+                        grid: { color: gridColor }
+                    },
+                    y: {
+                        title: { display: true, text: '신뢰도 (Correlation)', color: textColor },
+                        min: 0, max: 1,
+                        ticks: { color: textColor },
+                        grid: { color: gridColor }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        labels: { color: textColor, usePointStyle: true }
+                    },
+                    tooltip: {
+                        backgroundColor: isDark ? 'rgba(30, 41, 59, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+                        titleColor: isDark ? '#fff' : '#000',
+                        bodyColor: isDark ? '#fff' : '#000',
+                        borderColor: gridColor,
+                        borderWidth: 1
+                    }
+                }
+            }
+        });
+    }
+
+    // --------------------------------------------
+    // 이벤트 리스너
+    // --------------------------------------------
+    
+    // 카테고리 변경 시
+    categorySelect.addEventListener('change', () => {
+        renderStatToggles(categorySelect.value);
+    });
+
+    // 다크모드 토글 감지 (base.html의 버튼 클릭 시 차트 색상 업데이트)
+    // MutationObserver를 사용하여 html 태그의 class 변화 감지
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            if (mutation.attributeName === 'class') {
+                updateChart(); // 테마가 바뀌면 차트 다시 그리기 (색상 적용)
+            }
+        });
+    });
+    observer.observe(document.documentElement, { attributes: true });
+
+    // 초기 실행
+    document.addEventListener('DOMContentLoaded', () => {
+        renderStatToggles('Offense');
+    });
+
+</script>
+{% endblock %}
