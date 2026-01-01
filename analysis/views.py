@@ -6,6 +6,10 @@ import random
 import math
 import pandas as pd
 import os
+# 가성비 선수 지표를 위한
+from .models import MlbPlayerCost
+from django.db.models import Max
+
 
 # ------------------------------------------------------------------------------------------------------------------------
 # 강한 2번 타자
@@ -206,62 +210,57 @@ def relief_metrics_view(request):
 # ------------------------------------------------------------------------------------------------------------------------
 # 가성비 선수 지표 (dollars와 Cost per WAR)
 def cost_effectiveness_view(request):
-    years = list(range(2016, 2026))
+    selected_year = int(request.GET.get('year', 2025))
+    selected_type = request.GET.get('type', 'batter')
+
+    # 1. 전체 데이터 가져오기 (차트용)
+    queryset = MlbPlayerCost.objects.filter(year=selected_year, player_type=selected_type)
     
-    # 가상 선수 이름
-    mlb_stars = ["Ohtani", "Judge", "Betts", "Soto", "Harper", "Cole", "Seager", "Freeman", "Semien", "Lindor", "Witt Jr.", "Henderson"]
-    kbo_stars = ["김도영", "구자욱", "최정", "양의지", "강백호", "박건우", "손아섭", "박찬호", "홍창기", "최형우", "노시환", "문동주"]
+    # 차트 데이터 (Scatter Plot: x=연봉, y=가치)
+    scatter_data = []
+    for p in queryset:
+        # 연봉이나 가치가 있는 선수만
+        if p.salary > 0 or p.dollars > 0:
+            scatter_data.append({
+                'x': p.salary,
+                'y': p.dollars,
+                'name': p.name,
+                'team': p.team,
+                'surplus': p.surplus_value
+            })
 
-    def generate_financial_data(names, league):
-        year_data = {}
-        for year in years:
-            players = []
-            for name in names:
-                # 1. WAR 생성 (0.5 ~ 8.0)
-                war = round(random.uniform(0.5, 8.5), 1)
-                
-                # 2. 연봉(Salary) 생성
-                if league == 'MLB':
-                    # $700k ~ $50M (단위: 달러)
-                    salary = random.randint(700000, 50000000)
-                    war_value_constant = 8000000 # 1 WAR = $8M
-                else: # KBO
-                    # 5000만원 ~ 25억원 (단위: 원)
-                    salary = random.randint(50000000, 2500000000)
-                    war_value_constant = 500000000 # 1 WAR = 5억
+    # 2. Top 30 리스트 & 비율 계산용 Max값 추출
+    # Dollars 기준
+    top_dollars = queryset.order_by('-dollars')[:30]
+    max_dollars = top_dollars[0].dollars if top_dollars else 1
+    
+    # 리스트에 비율(percentage) 속성 추가 (템플릿에서 바 그래프용)
+    top_dollars_list = []
+    for p in top_dollars:
+        p.pct = (p.dollars / max_dollars) * 100 if max_dollars else 0
+        top_dollars_list.append(p)
 
-                # 3. 지표 계산
-                # (1) Dollars (선수의 가치 환산 금액)
-                dollars = war * war_value_constant
-                
-                # (2) CPW (Cost Per WAR, 가성비) - 낮을수록 좋음
-                # WAR이 너무 낮으면 가성비 논하기 어려우므로 제외하거나 처리
-                cpw = salary / war if war > 0 else 999999999999
+    # Surplus 기준
+    top_surplus = queryset.order_by('-surplus_value')[:30]
+    max_surplus = top_surplus[0].surplus_value if top_surplus else 1
+    
+    top_surplus_list = []
+    for p in top_surplus:
+        p.pct = (p.surplus_value / max_surplus) * 100 if max_surplus else 0
+        top_surplus_list.append(p)
 
-                players.append({
-                    'name': name,
-                    'team': f"{league} Team",
-                    'war': war,
-                    'salary': salary,
-                    'dollars': dollars,
-                    'cpw': round(cpw)
-                })
-            
-            year_data[year] = players
-        return year_data
-
-    all_data = {
-        'mlb': generate_financial_data(mlb_stars, 'MLB'),
-        'kbo': generate_financial_data(kbo_stars, 'KBO')
-    }
+    years = list(range(2020, 2026))
 
     context = {
-        'years': json.dumps(years),
-        'all_data': json.dumps(all_data)
+        'years': years,
+        'selected_year': selected_year,
+        'selected_type': selected_type,
+        'top_dollars': top_dollars_list,
+        'top_surplus': top_surplus_list,
+        'scatter_data': json.dumps(scatter_data), # JSON으로 변환해서 전달
     }
     
     return render(request, 'analysis/cost_effectiveness.html', context)
-
 
 # ------------------------------------------------------------------------------------------------------------------------
 # 샘플 사이즈와 신뢰도

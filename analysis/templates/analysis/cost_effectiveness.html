@@ -1,192 +1,276 @@
 {% extends 'core/base.html' %}
+{% load humanize %}
+{% load static %}
 
 {% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <div class="space-y-10 animate-fade-in-up">
     
     <div class="text-center space-y-4">
-        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">가성비 & 가치 평가 (Moneyball)</h1>
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">가성비 & 가치 평가 (Cost Effectiveness)</h1>
         <p class="text-gray-600 dark:text-gray-400">
-            선수의 퍼포먼스를 금전적 가치로 환산하고(Dollars),<br>
-            누가 가장 적은 비용으로 최고의 효율을 냈는지(CPW) 분석합니다.
+            선수의 실제 활약 가치(Dollars)와 연봉 대비 효율(Surplus)을 분석합니다.<br>
+            <span class="text-xs text-gray-500">* 데이터 출처: 실제 연봉 및 WAR 데이터</span>
         </p>
     </div>
 
     <div class="bg-white dark:bg-cardDark p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col md:flex-row justify-between items-center gap-4">
-        <div class="flex space-x-2">
-            <button id="btn-mlb" class="px-5 py-2 rounded-lg font-bold transition text-sm shadow-md bg-primary text-white" onclick="setLeague('mlb')">
-                MLB ($)
-            </button>
-            <button id="btn-kbo" class="px-5 py-2 rounded-lg font-bold transition text-sm bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300" onclick="setLeague('kbo')">
-                KBO (₩)
-            </button>
-        </div>
-        <div class="flex items-center space-x-2">
-            <label class="text-sm font-medium text-gray-500">Season:</label>
-            <select id="yearSelect" class="bg-gray-100 dark:bg-gray-700 border-none rounded-lg py-2 px-4 focus:ring-2 focus:ring-primary font-bold text-gray-900 dark:text-white" onchange="updateDashboard()">
+        <form id="filterForm" method="get" class="flex flex-col md:flex-row gap-4 w-full md:w-auto items-center">
+            
+            <div class="bg-gray-100 dark:bg-gray-700 p-1 rounded-lg flex">
+                <button type="button" onclick="submitType('batter')" 
+                    class="px-4 py-1.5 rounded-md text-sm font-bold transition {% if selected_type == 'batter' %}bg-white text-primary shadow-sm{% else %}text-gray-500 hover:text-gray-700 dark:text-gray-400{% endif %}">
+                    타자 (Batter)
+                </button>
+                <button type="button" onclick="submitType('pitcher')" 
+                    class="px-4 py-1.5 rounded-md text-sm font-bold transition {% if selected_type == 'pitcher' %}bg-white text-primary shadow-sm{% else %}text-gray-500 hover:text-gray-700 dark:text-gray-400{% endif %}">
+                    투수 (Pitcher)
+                </button>
+                <input type="hidden" name="type" id="typeInput" value="{{ selected_type }}">
+            </div>
+
+            <div class="flex items-center space-x-2">
+                <label class="text-sm font-medium text-gray-500">Season:</label>
+                <select name="year" onchange="this.form.submit()" 
+                    class="bg-gray-50 dark:bg-gray-800 border-none rounded-lg py-2 pl-3 pr-8 focus:ring-2 focus:ring-primary font-bold text-gray-900 dark:text-white text-sm">
+                    {% for y in years %}
+                        <option value="{{ y }}" {% if y == selected_year %}selected{% endif %}>{{ y }}</option>
+                    {% endfor %}
                 </select>
+            </div>
+        </form>
+    </div>
+
+    <div class="bg-white dark:bg-cardDark p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700">
+        <div class="mb-6 flex justify-between items-end">
+            <div>
+                <h2 class="text-xl font-bold text-gray-900 dark:text-white">💰 Salary vs Real Value Correlation</h2>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    X축: 연봉 (Salary) / Y축: 실제 활약 가치 (Dollars Value)
+                </p>
+            </div>
+        </div>
+        <div class="relative h-96 w-full">
+            <canvas id="scatterChart"></canvas>
         </div>
     </div>
 
-    <div class="bg-white dark:bg-cardDark p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
-        <div class="mb-6">
-            <h2 class="text-xl font-bold text-green-600 dark:text-green-400">💰 Dollars: Top 10 Performance Value</h2>
-            <p class="text-sm text-gray-400">Fangraphs Dollars 기반: WAR을 화폐 가치로 환산한 금액 (높을수록 좋음)</p>
-        </div>
-        <div class="relative h-80 w-full">
-            <canvas id="dollarsChart"></canvas>
-        </div>
-    </div>
-
-    <div class="bg-white dark:bg-cardDark p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
-        <div class="mb-6">
-            <h2 class="text-xl font-bold text-purple-600 dark:text-purple-400">📉 Cost Per WAR: Top 10 Efficiency</h2>
-            <p class="text-sm text-gray-400">1 WAR을 얻기 위해 지출한 연봉 (낮을수록 좋음, WAR 양수 선수 대상)</p>
-        </div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
-        <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse">
-                <thead>
-                    <tr class="border-b dark:border-gray-600 text-xs uppercase text-gray-400">
-                        <th class="py-3 px-4">Rank</th>
-                        <th class="py-3 px-4">Player</th>
-                        <th class="py-3 px-4 text-right">Salary (연봉)</th>
-                        <th class="py-3 px-4 text-right">WAR</th>
-                        <th class="py-3 px-4 text-right">Cost / WAR</th>
-                    </tr>
-                </thead>
-                <tbody id="cpwTableBody">
+        <div class="bg-white dark:bg-cardDark p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700">
+            <div class="mb-4 pb-2 border-b border-gray-100 dark:border-gray-700">
+                <h2 class="text-lg font-bold text-blue-600 dark:text-blue-400 flex items-center">
+                    <span class="mr-2">🏆</span> Top 30 Value (Dollars)
+                </h2>
+                <p class="text-xs text-gray-400 mt-1">순수하게 가장 높은 가치를 생산한 선수들</p>
+            </div>
+            
+            <div class="overflow-x-auto max-h-[600px] overflow-y-auto custom-scrollbar">
+                <table class="w-full text-left border-collapse">
+                    <thead class="sticky top-0 bg-white dark:bg-cardDark z-10">
+                        <tr class="text-xs uppercase text-gray-400 border-b dark:border-gray-600">
+                            <th class="py-3 px-2 text-center">Rank</th>
+                            <th class="py-3 px-2">Player</th>
+                            <th class="py-3 px-2 text-right">WAR</th>
+                            <th class="py-3 px-2 text-right">Dollars</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-sm">
+                        {% for player in top_dollars %}
+                        <tr class="border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 transition group">
+                            <td class="py-3 px-2 text-center">
+                                {% if forloop.counter == 1 %}
+                                    <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-yellow-400 text-white font-bold text-xs shadow-sm">1</span>
+                                {% elif forloop.counter == 2 %}
+                                    <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gray-400 text-white font-bold text-xs shadow-sm">2</span>
+                                {% elif forloop.counter == 3 %}
+                                    <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-orange-400 text-white font-bold text-xs shadow-sm">3</span>
+                                {% else %}
+                                    <span class="text-gray-400 font-medium">{{ forloop.counter }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-3 px-2">
+                                <div class="font-bold text-gray-800 dark:text-gray-200">{{ player.name }}</div>
+                                <div class="text-xs text-gray-400">{{ player.team }}</div>
+                            </td>
+                            <td class="py-3 px-2 text-right font-bold text-gray-600 dark:text-gray-400">
+                                {{ player.war|floatformat:1 }}
+                            </td>
+                            <td class="py-3 px-2 text-right">
+                                <div class="font-bold text-blue-600 dark:text-blue-400">${{ player.dollars|intword }}</div>
+                                <div class="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1.5 mt-1">
+                                    <div class="bg-blue-500 h-1.5 rounded-full" style="width: {{ player.pct }}%"></div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4" class="text-center py-10 text-gray-400">데이터가 없습니다.</td></tr>
+                        {% endfor %}
                     </tbody>
-            </table>
+                </table>
+            </div>
         </div>
+
+        <div class="bg-white dark:bg-cardDark p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700">
+            <div class="mb-4 pb-2 border-b border-gray-100 dark:border-gray-700">
+                <h2 class="text-lg font-bold text-green-600 dark:text-green-400 flex items-center">
+                    <span class="mr-2">📈</span> Top 30 Efficiency (Surplus)
+                </h2>
+                <p class="text-xs text-gray-400 mt-1">연봉 대비 초과 가치를 생산한 '혜자' 선수들</p>
+            </div>
+
+            <div class="overflow-x-auto max-h-[600px] overflow-y-auto custom-scrollbar">
+                <table class="w-full text-left border-collapse">
+                    <thead class="sticky top-0 bg-white dark:bg-cardDark z-10">
+                        <tr class="text-xs uppercase text-gray-400 border-b dark:border-gray-600">
+                            <th class="py-3 px-2 text-center">Rank</th>
+                            <th class="py-3 px-2">Player</th>
+                            <th class="py-3 px-2 text-right">Salary</th>
+                            <th class="py-3 px-2 text-right">Surplus</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-sm">
+                        {% for player in top_surplus %}
+                        <tr class="border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 transition group">
+                            <td class="py-3 px-2 text-center">
+                                <span class="text-gray-400 font-medium">{{ forloop.counter }}</span>
+                            </td>
+                            <td class="py-3 px-2">
+                                <div class="font-bold text-gray-800 dark:text-gray-200">{{ player.name }}</div>
+                                <div class="text-xs text-gray-400">{{ player.team }}</div>
+                            </td>
+                            <td class="py-3 px-2 text-right text-gray-500 text-xs">
+                                ${{ player.salary|intword }}
+                            </td>
+                            <td class="py-3 px-2 text-right">
+                                <div class="font-bold text-green-600 dark:text-green-400">+${{ player.surplus_value|intword }}</div>
+                                <div class="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1.5 mt-1">
+                                    <div class="bg-green-500 h-1.5 rounded-full" style="width: {{ player.pct }}%"></div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4" class="text-center py-10 text-gray-400">데이터가 없습니다.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
     </div>
 
 </div>
 
 <script>
-    // 1. 데이터 파싱
-    const allData = JSON.parse('{{ all_data|safe }}');
-    const years = JSON.parse('{{ years|safe }}');
-    
-    let currentLeague = 'mlb';
-    let dollarsChart = null;
-
-    // 2. 초기화
-    const yearSelect = document.getElementById('yearSelect');
-    years.forEach(y => {
-        const opt = document.createElement('option');
-        opt.value = y;
-        opt.innerText = y;
-        yearSelect.appendChild(opt);
-    });
-    yearSelect.value = 2024;
-
-    // 3. 화폐 포맷터 (핵심!)
-    const formatCurrency = (value, league) => {
-        if (league === 'mlb') {
-            return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
-        } else {
-            // KBO는 '원' 단위인데 숫자가 너무 크므로 '억원' 등으로 표기하거나 포맷팅
-            return new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(value);
-        }
-    };
-
-    function setLeague(league) {
-        currentLeague = league;
-        
-        // 버튼 스타일 토글
-        const btnMlb = document.getElementById('btn-mlb');
-        const btnKbo = document.getElementById('btn-kbo');
-        const activeClass = "bg-primary text-white shadow-md";
-        const inactiveClass = "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300";
-
-        if (league === 'mlb') {
-            btnMlb.className = `px-5 py-2 rounded-lg font-bold transition text-sm ${activeClass}`;
-            btnKbo.className = `px-5 py-2 rounded-lg font-bold transition text-sm ${inactiveClass}`;
-        } else {
-            btnMlb.className = `px-5 py-2 rounded-lg font-bold transition text-sm ${inactiveClass}`;
-            btnKbo.className = `px-5 py-2 rounded-lg font-bold transition text-sm ${activeClass}`;
-        }
-        updateDashboard();
+    // 1. 타자/투수 버튼 클릭 핸들러
+    function submitType(type) {
+        document.getElementById('typeInput').value = type;
+        document.getElementById('filterForm').submit();
     }
 
-    function updateDashboard() {
-        const selectedYear = yearSelect.value;
-        const yearData = allData[currentLeague][selectedYear];
+    // 2. 차트 데이터 파싱
+    // Django 템플릿 필터 escapejs를 사용하여 안전하게 JSON 문자열로 변환
+    const rawData = JSON.parse('{{ scatter_data|escapejs }}');
+    
+    // Chart.js 형식에 맞게 데이터 매핑
+    const chartData = rawData.map(item => ({
+        x: item.x, 
+        y: item.y, 
+        name: item.name,
+        team: item.team,
+        surplus: item.surplus
+    }));
 
-        // --- 1. Dollars Top 10 (내림차순 정렬) ---
-        const dollarsTop10 = [...yearData].sort((a, b) => b.dollars - a.dollars).slice(0, 10);
+    const ctx = document.getElementById('scatterChart').getContext('2d');
 
-        const ctx = document.getElementById('dollarsChart').getContext('2d');
-        if (dollarsChart) dollarsChart.destroy();
+    // 다크모드 대응을 위한 차트 색상 설정
+    const isDark = document.documentElement.classList.contains('dark');
+    const gridColor = isDark ? '#374151' : '#f3f4f6'; // dark:gray-700 or gray-100
+    const textColor = isDark ? '#9ca3af' : '#6b7280'; // gray-400 or gray-500
 
-        dollarsChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: dollarsTop10.map(p => p.name),
-                datasets: [{
-                    label: 'Dollars Value',
-                    data: dollarsTop10.map(p => p.dollars),
-                    backgroundColor: '#10B981', // Green
-                    borderRadius: 6,
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                indexAxis: 'y', // 가로 막대 그래프
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        callbacks: {
-                            label: (ctx) => formatCurrency(ctx.raw, currentLeague)
-                        }
-                    }
+    new Chart(ctx, {
+        type: 'scatter',
+        data: {
+            datasets: [{
+                label: 'Players',
+                data: chartData,
+                backgroundColor: function(context) {
+                    const val = context.raw;
+                    if (!val) return '#3b82f6';
+                    // Surplus > 0 (혜자): Green, < 0 (먹튀): Red
+                    return val.surplus > 0 ? 'rgba(16, 185, 129, 0.7)' : 'rgba(239, 68, 68, 0.7)';
                 },
-                scales: {
-                    x: {
-                        ticks: {
-                            callback: (val) => {
-                                // 축 단위 간소화 (M = Million, 억)
-                                if (currentLeague === 'mlb') return '$' + (val / 1000000) + 'M';
-                                return (val / 100000000) + '억';
-                            }
+                borderColor: function(context) {
+                    const val = context.raw;
+                    if (!val) return '#3b82f6';
+                    return val.surplus > 0 ? '#10b981' : '#ef4444';
+                },
+                borderWidth: 1,
+                pointRadius: 6,
+                pointHoverRadius: 9
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: isDark ? 'rgba(31, 41, 55, 0.9)' : 'rgba(255, 255, 255, 0.95)',
+                    titleColor: isDark ? '#f3f4f6' : '#111827',
+                    bodyColor: isDark ? '#d1d5db' : '#4b5563',
+                    borderColor: isDark ? '#4b5563' : '#e5e7eb',
+                    borderWidth: 1,
+                    padding: 12,
+                    displayColors: false,
+                    callbacks: {
+                        label: function(context) {
+                            const p = context.raw;
+                            // 포맷팅
+                            const salary = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumSignificantDigits: 3 }).format(p.x);
+                            const value = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumSignificantDigits: 3 }).format(p.y);
+                            return `${p.name} (${p.team}): Sal ${salary} / Val ${value}`;
                         }
                     }
                 }
+            },
+            scales: {
+                x: {
+                    title: { display: true, text: 'Salary (AAV)', color: textColor, font: {weight: 'bold'} },
+                    grid: { color: gridColor },
+                    ticks: {
+                        color: textColor,
+                        callback: function(value) { return '$' + value / 1000000 + 'M'; }
+                    }
+                },
+                y: {
+                    title: { display: true, text: 'Real Value (Dollars)', color: textColor, font: {weight: 'bold'} },
+                    grid: { color: gridColor },
+                    ticks: {
+                        color: textColor,
+                        callback: function(value) { return '$' + value / 1000000 + 'M'; }
+                    }
+                }
             }
-        });
-
-        // --- 2. CPW Top 10 (오름차순 정렬, WAR 양수만) ---
-        const cpwTop10 = [...yearData]
-            .filter(p => p.war > 0) // WAR 양수만
-            .sort((a, b) => a.cpw - b.cpw) // 비용이 적을수록 상위권
-            .slice(0, 10);
-
-        const tableBody = document.getElementById('cpwTableBody');
-        tableBody.innerHTML = '';
-
-        cpwTop10.forEach((p, index) => {
-            const tr = document.createElement('tr');
-            tr.className = "border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition";
-            
-            // CPW 값을 읽기 좋게 포맷팅
-            const cpwFormatted = currentLeague === 'mlb' 
-                ? `$${(p.cpw / 1000000).toFixed(2)}M / WAR` 
-                : `${(p.cpw / 100000000).toFixed(2)}억 / WAR`;
-
-            tr.innerHTML = `
-                <td class="py-3 px-4 font-bold text-gray-500">${index + 1}</td>
-                <td class="py-3 px-4 font-bold text-gray-800 dark:text-gray-200">${p.name} <span class="text-xs font-normal text-gray-400">(${p.team})</span></td>
-                <td class="py-3 px-4 text-right text-gray-600 dark:text-gray-400">${formatCurrency(p.salary, currentLeague)}</td>
-                <td class="py-3 px-4 text-right font-bold text-blue-500">${p.war}</td>
-                <td class="py-3 px-4 text-right font-bold text-purple-600">${cpwFormatted}</td>
-            `;
-            tableBody.appendChild(tr);
-        });
-    }
-
-    // 실행
-    updateDashboard();
-
+        }
+    });
 </script>
+
+<style>
+    /* 테이블 내부 스크롤바 스타일링 (Webkit) */
+    .custom-scrollbar::-webkit-scrollbar {
+        width: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        background-color: rgba(156, 163, 175, 0.5);
+        border-radius: 20px;
+    }
+    .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+        background-color: rgba(75, 85, 99, 0.5);
+    }
+</style>
 {% endblock %}

@@ -26,3 +26,16 @@ simulation/data/
 data_science/*.json
 data_science/*.csv
 data_science/*.xlsx
+
+# --- 추가 내용 ---
+
+# Mac/Windows 시스템 파일 (협업 시 충돌 방지)
+.DS_Store
+Thumbs.db
+
+# Data Science 하위 데이터 폴더들 (통째로 무시)
+data_science/raw_data/
+data_science/data/
+
+# 혹시 주피터 노트북을 쓴다면
+.ipynb_checkpoints/
