@@ -19,8 +19,14 @@ env/
 .idea/
 .vscode/
 
-# 무거운 데이터들
+# --- [수정됨] 데이터 관련 폴더들 ---
+
+# Simulation 앱 데이터
 simulation/data/
+
+# Analysis 앱 데이터 (새로 추가한 부분!)
+# RP_stats, Strong_2nd 관련 CSV 파일들을 무시합니다.
+analysis/data/
 
 # DS에서 또 무거운 것들
 data_science/*.json

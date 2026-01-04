@@ -14,60 +14,158 @@ from django.db.models import Max
 # ------------------------------------------------------------------------------------------------------------------------
 # 강한 2번 타자
 def strong_second_view(request):
-    years = list(range(2016, 2026)) # 2016 ~ 2025
+    target_years = list(range(2016, 2026))
     
-    # 1. 팀 목록 정의
-    mlb_teams = [
-        "ARI", "ATL", "BAL", "BOS", "CHC", "CWS", "CIN", "CLE", "COL", "DET",
-        "HOU", "KC", "LAA", "LAD", "MIA", "MIL", "MIN", "NYM", "NYY", "OAK",
-        "PHI", "PIT", "SD", "SF", "SEA", "STL", "TB", "TEX", "TOR", "WSH"
-    ]
-    kbo_teams = [
-        "KIA", "Samsung", "LG", "Doosan", "KT", "SSG", "Lotte", "Hanwha", "NC", "Kiwoom"
-    ]
-
-    # 2. 선수 이름 풀
-    mlb_players = ["Ohtani", "Judge", "Betts", "Freeman", "Soto", "Acuna", "Harper", "Witt Jr.", "Henderson", "Trout"]
+    # KBO 가상 데이터용
+    kbo_teams = ["KIA", "Samsung", "LG", "Doosan", "KT", "SSG", "Lotte", "Hanwha", "NC", "Kiwoom"]
     kbo_players = ["김도영", "구자욱", "홍창기", "양의지", "최정", "로하스", "에레디아", "박건우", "강백호", "노시환"]
 
-    # 3. 데이터 생성 함수 (리그별)
-    def generate_league_data(teams, player_names):
-        league_data = {} # 팀별 데이터
-        avg_data = {}    # 리그 평균 데이터 (연도별)
+    def load_mlb_real_data():
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        data_dir = os.path.join(base_dir, 'analysis', 'data')
+        
+        mlb_data = {}
+        mlb_teams_set = set()
+        avg_data = {y: {} for y in target_years}
 
-        # (1) 리그 평균 생성
-        for year in years:
+        suffixes = {1: '1st', 2: '2nd', 3: '3rd', 4: '4th', 
+                    5: '5th', 6: '6th', 7: '7th', 8: '8th', 9: '9th'}
+        
+        print("--- MLB 데이터 로드 시작 (데이터 분리 적용) ---")
+
+        for folder_year in target_years:
+            for order, suffix in suffixes.items():
+                filename = f"Splits Leaderboard Data Batting {suffix}.csv"
+                stats_path = os.path.join(data_dir, 'batting_order', str(folder_year), filename)
+                freq_path = os.path.join(data_dir, 'frequency', str(folder_year), filename)
+
+                if not os.path.exists(stats_path) or not os.path.exists(freq_path):
+                    continue
+
+                try:
+                    # (1) 팀 성적 데이터 로드
+                    df_stats = pd.read_csv(stats_path, encoding='utf-8-sig')
+                    df_stats.columns = df_stats.columns.str.strip()
+
+                    # (2) 선수 빈도 데이터 로드
+                    df_freq = pd.read_csv(freq_path, encoding='utf-8-sig')
+                    df_freq.columns = df_freq.columns.str.strip()
+
+                    # (3) 데이터 전처리 (숫자 변환)
+                    # 팀 데이터 숫자 변환
+                    for col in ['OPS', 'wRC+', 'PA', 'Season']:
+                        if col in df_stats.columns:
+                            df_stats[col] = pd.to_numeric(df_stats[col], errors='coerce').fillna(0)
+                    
+                    # 선수 데이터 숫자 변환
+                    for col in ['PA', 'OPS', 'wRC+']:
+                        if col in df_freq.columns:
+                            df_freq[col] = pd.to_numeric(df_freq[col], errors='coerce').fillna(0)
+
+                    # (4) 대표 선수 추출 (선수 개인 성적 포함)
+                    if not df_freq.empty and 'PA' in df_freq.columns:
+                        df_freq = df_freq.sort_values(by='PA', ascending=False)
+                        # 팀별 최다 타석 선수 1명 추출
+                        df_rep = df_freq.drop_duplicates(subset=['Tm'], keep='first').copy()
+                        
+                        # [핵심] 선수 개인 성적 컬럼명 변경 (팀 성적과 구분하기 위해 'Player' 접두사 붙임)
+                        # Name -> PlayerName, PA -> PlayerPA, OPS -> PlayerOPS, wRC+ -> PlayerWRC
+                        rename_map = {
+                            'Name': 'PlayerName',
+                            'PA': 'PlayerPA',
+                            'OPS': 'PlayerOPS',
+                            'wRC+': 'PlayerWRC'
+                        }
+                        # 존재하는 컬럼만 변경
+                        rename_cols = {k: v for k, v in rename_map.items() if k in df_rep.columns}
+                        df_rep = df_rep.rename(columns=rename_cols)
+                    else:
+                        df_rep = pd.DataFrame(columns=['Tm', 'PlayerName', 'PlayerPA', 'PlayerOPS', 'PlayerWRC'])
+
+                    # (5) 데이터 병합 (Team 기준)
+                    # df_stats(팀 성적) + df_rep(선수 성적)
+                    # 필요한 컬럼만 선택해서 병합
+                    player_cols = [c for c in ['Tm', 'PlayerName', 'PlayerPA', 'PlayerOPS', 'PlayerWRC'] if c in df_rep.columns]
+                    merged_df = pd.merge(df_stats, df_rep[player_cols], on='Tm', how='left')
+
+                    # (6) 딕셔너리 저장
+                    for _, row in merged_df.iterrows():
+                        team = row['Tm']
+                        real_year = int(row['Season']) # 파일 내부의 실제 연도 사용
+                        
+                        if real_year not in target_years: continue
+
+                        if team not in mlb_data: mlb_data[team] = {}
+                        if real_year not in mlb_data[team]: mlb_data[team][real_year] = {}
+                        
+                        # 데이터 할당
+                        mlb_data[team][real_year][order] = {
+                            # A. 팀 성적 (좌측 그래프용)
+                            'team_ops': round(row['OPS'], 3),
+                            'team_wrc': round(row['wRC+'], 1) if 'wRC+' in row else 0.0,
+                            'team_pa': int(row['PA']) if 'PA' in row else 0,
+                            
+                            # B. 선수 성적 (우측 박스용)
+                            'player_name': row['PlayerName'] if pd.notna(row.get('PlayerName')) else "Unknown",
+                            'player_pa': int(row['PlayerPA']) if pd.notna(row.get('PlayerPA')) else 0,
+                            'player_ops': round(row['PlayerOPS'], 3) if pd.notna(row.get('PlayerOPS')) else 0.000,
+                            'player_wrc': round(row['PlayerWRC'], 1) if pd.notna(row.get('PlayerWRC')) else 0.0
+                        }
+                        mlb_teams_set.add(team)
+
+                    # (7) 리그 평균 계산
+                    if not df_stats.empty:
+                        current_file_year = int(df_stats['Season'].mode()[0])
+                        if current_file_year in target_years:
+                            if order not in avg_data[current_file_year]:
+                                avg_data[current_file_year][order] = {}
+                            
+                            avg_data[current_file_year][order] = {
+                                'ops': round(df_stats['OPS'].mean(), 3),
+                                'wrc_plus': round(df_stats['wRC+'].mean(), 1) if 'wRC+' in df_stats.columns else 0.0
+                            }
+
+                except Exception as e:
+                    print(f"[Error] {folder_year}년 {order}번 타순 처리 중 오류: {e}")
+
+        print(f"--- 로드 완료: {len(mlb_teams_set)}개 팀 ---")
+        return mlb_data, avg_data, sorted(list(mlb_teams_set))
+
+    # KBO 더미 데이터 (구조 맞춰줌)
+    def generate_kbo_dummy_data(teams, player_names):
+        league_data = {} 
+        avg_data = {}    
+        for year in target_years:
             avg_data[year] = {}
             for order in range(1, 10):
-                # 2번 타자 강세 트렌드 반영 (랜덤)
-                base = 0.780 if order == 2 else 0.700
-                avg_data[year][order] = round(base + random.uniform(-0.05, 0.05), 3)
-
-        # (2) 팀별 상세 데이터 생성
+                avg_data[year][order] = {'ops': 0.750}
+        
         for team in teams:
             league_data[team] = {}
-            for year in years:
+            for year in target_years:
                 league_data[team][year] = {}
                 for order in range(1, 10):
-                    avg = avg_data[year][order]
                     league_data[team][year][order] = {
-                        'ops': round(avg + random.uniform(-0.1, 0.1), 3),
-                        'player_name': f"{random.choice(player_names)}",
-                        'games': random.randint(80, 144)
+                        'team_ops': round(0.750 + random.uniform(-0.1, 0.1), 3),
+                        'team_wrc': round(100 + random.uniform(-20, 20), 1),
+                        'team_pa': random.randint(600, 700),
+                        'player_name': random.choice(player_names),
+                        'player_pa': random.randint(400, 600),
+                        'player_ops': round(0.800 + random.uniform(-0.1, 0.1), 3),
+                        'player_wrc': round(110 + random.uniform(-20, 20), 1)
                     }
         return league_data, avg_data
 
-    # 4. 데이터 생성 및 구조화
-    kbo_teams_data, kbo_avg = generate_league_data(kbo_teams, kbo_players)
-    mlb_teams_data, mlb_avg = generate_league_data(mlb_teams, mlb_players)
+    mlb_teams_data, mlb_avg, mlb_team_list = load_mlb_real_data()
+    kbo_teams_data, kbo_avg = generate_kbo_dummy_data(kbo_teams, kbo_players)
 
     all_data = {
         'kbo': {'teams_data': kbo_teams_data, 'avg_data': kbo_avg, 'team_list': kbo_teams},
-        'mlb': {'teams_data': mlb_teams_data, 'avg_data': mlb_avg, 'team_list': mlb_teams}
+        'mlb': {'teams_data': mlb_teams_data, 'avg_data': mlb_avg, 'team_list': mlb_team_list}
     }
 
     context = {
-        'years': json.dumps(years),
+        'years': json.dumps(target_years),
         'all_data': json.dumps(all_data)
     }
     
@@ -162,46 +260,71 @@ def pitcher_meta_view(request):
 # ------------------------------------------------------------------------------------------------------------------------
 # 불펜투수 지표
 def relief_metrics_view(request):
-    # 1. 설정
-    years = list(range(2016, 2026)) # 2016 ~ 2025
+    # 1. 파일 경로 설정
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    kbo_csv_path = os.path.join(base_dir, 'analysis', 'data', 'RP_stats_KBO.csv')
+    mlb_csv_path = os.path.join(base_dir, 'analysis', 'data', 'RP_stats_MLB.csv')
     
-    # 가상 선수 이름 풀 (랜덤 생성용)
-    kbo_names = ["오승환", "김원중", "조상우", "정우영", "박영현", "서진용", "임창민", "고우석", "정해영", "이용찬", "김재윤", "문경찬", "하준영", "김태훈", "최지민"]
-    mlb_names = ["Diaz", "Hader", "Clase", "Phillips", "Holmes", "Duran", "Hendriks", "Iglesias", "Pressly", "Chapman", "Bautista", "Bednar", "Romano", "Doval", "Fairbanks"]
-    
-    # 2. 데이터 생성 함수
-    def generate_year_data(names, league_prefix):
-        year_data = {}
-        for year in years:
-            players = []
-            # 연도별로 15명의 불펜 투수 데이터 생성 (나중에 상위 10명만 자를 것임)
-            for name in names:
-                # WPA: -1.0 ~ 5.0 사이 랜덤
-                wpa = round(random.uniform(-1.0, 5.0), 2)
-                # gmLI: 0.8 ~ 2.5 사이 랜덤 (중요도)
-                gmli = round(random.uniform(0.8, 2.5), 2)
-                
-                players.append({
-                    'name': name,
-                    'team': f"{league_prefix} Team", # 팀명은 임시
-                    'wpa': wpa,
-                    'gmli': gmli,
-                    'year': year
-                })
-            
-            # WPA 높은 순으로 정렬해둠 (선택사항, 프론트에서도 할 수 있음)
-            players.sort(key=lambda x: x['wpa'], reverse=True)
-            year_data[year] = players
-        return year_data
+    # 2. 데이터 처리 함수
+    def process_data(file_path, start_year, end_year, top_n=30):
+        data_by_year = {}
+        valid_years = []
 
-    # 3. 데이터 구축
+        if not os.path.exists(file_path):
+            print(f"File not found: {file_path}") # 디버깅용
+            return {}, []
+
+        try:
+            # 한글이 포함된 CSV일 수 있으므로 encoding 주의 (utf-8-sig 또는 cp949)
+            # 여기서는 일반적인 utf-8로 시도합니다. 에러 시 encoding='cp949'로 변경해보세요.
+            df = pd.read_csv(file_path, encoding='utf-8')
+            
+            # 컬럼명 공백 제거 (혹시 모를 오류 방지)
+            df.columns = df.columns.str.strip()
+            
+            # 연도 데이터 정수형 변환 및 필터링
+            df['Year'] = pd.to_numeric(df['Year'], errors='coerce').fillna(0).astype(int)
+            df = df[(df['Year'] >= start_year) & (df['Year'] <= end_year)]
+            
+            valid_years = sorted(df['Year'].unique().tolist())
+            
+            for year in valid_years:
+                year_df = df[df['Year'] == year].copy()
+                
+                # WPA 기준 내림차순 정렬 후 상위 N명 추출
+                year_df = year_df.sort_values(by='WPA', ascending=False).head(top_n)
+                
+                # 프론트엔드 전송용 리스트 변환
+                players = []
+                for _, row in year_df.iterrows():
+                    players.append({
+                        'name': row['Name'],
+                        'team': row['Team'],
+                        'wpa': round(float(row['WPA']), 2),
+                        # gmLI가 없는 경우 0.0 처리
+                        'gmli': round(float(row['gmLI']), 2) if 'gmLI' in row else 0.0,
+                        'year': year
+                    })
+                data_by_year[year] = players
+                
+        except Exception as e:
+            print(f"Error processing {file_path}: {e}")
+            
+        return data_by_year, valid_years
+
+    # 3. 데이터 로드 (KBO: 2019~, MLB: 2016~, Top n)
+    kbo_data, kbo_years = process_data(kbo_csv_path, 2019, 2025, 10)
+    mlb_data, mlb_years = process_data(mlb_csv_path, 2016, 2025, 30)
+
     all_data = {
-        'kbo': generate_year_data(kbo_names, "KBO"),
-        'mlb': generate_year_data(mlb_names, "MLB")
+        'kbo': kbo_data,
+        'mlb': mlb_data
     }
 
     context = {
-        'years': json.dumps(years),
+        # 각 리그별 가능한 연도 리스트를 따로 전달
+        'kbo_years': json.dumps(kbo_years),
+        'mlb_years': json.dumps(mlb_years),
         'all_data': json.dumps(all_data)
     }
     

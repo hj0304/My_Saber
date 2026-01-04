@@ -11,31 +11,22 @@
     </div>
 
     <div class="bg-white dark:bg-cardDark p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
-        
         <div class="flex flex-col md:flex-row gap-4 justify-between items-center">
             
             <div class="flex space-x-2">
-                <button id="btn-mlb" class="px-5 py-2 rounded-lg font-bold transition text-sm shadow-md bg-primary text-white" onclick="setLeague('mlb')">
-                    MLB
-                </button>
-                <button id="btn-kbo" class="px-5 py-2 rounded-lg font-bold transition text-sm bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300" onclick="setLeague('kbo')">
-                    KBO
-                </button>
+                <button id="btn-mlb" class="px-5 py-2 rounded-lg font-bold transition text-sm shadow-md bg-primary text-white" onclick="setLeague('mlb')">MLB</button>
+                <button id="btn-kbo" class="px-5 py-2 rounded-lg font-bold transition text-sm bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300" onclick="setLeague('kbo')">KBO</button>
             </div>
 
             <div class="flex space-x-4 w-full md:w-auto">
                 <div class="w-1/3 md:w-auto">
                     <label class="block text-xs font-medium text-gray-500 mb-1">Year</label>
-                    <select id="yearSelect" class="w-full md:w-32 p-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-none outline-none focus:ring-2 focus:ring-primary dark:text-white font-bold">
-                        </select>
+                    <select id="yearSelect" class="w-full md:w-32 p-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-none outline-none focus:ring-2 focus:ring-primary dark:text-white font-bold"></select>
                 </div>
-
                 <div class="w-1/3 md:w-auto">
                     <label class="block text-xs font-medium text-gray-500 mb-1">Team</label>
-                    <select id="teamSelect" class="w-full md:w-32 p-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-none outline-none focus:ring-2 focus:ring-primary dark:text-white font-bold">
-                        </select>
+                    <select id="teamSelect" class="w-full md:w-32 p-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-none outline-none focus:ring-2 focus:ring-primary dark:text-white font-bold"></select>
                 </div>
-
                 <div class="w-1/3 md:w-auto">
                     <label class="block text-xs font-medium text-gray-500 mb-1">Order</label>
                     <select id="orderSelect" class="w-full md:w-32 p-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-none outline-none focus:ring-2 focus:ring-primary dark:text-white font-bold">
@@ -76,14 +67,18 @@
                     <p id="playerTeam" class="text-xl opacity-90 mt-1">Team Info</p>
                 </div>
                 
-                <div class="grid grid-cols-2 gap-4 mt-6 pt-6 border-t border-white/20">
+                <div class="grid grid-cols-3 gap-2 mt-6 pt-6 border-t border-white/20">
                     <div>
-                        <span class="block text-xs opacity-60 uppercase">OPS</span>
-                        <span id="playerOps" class="text-2xl font-bold">0.000</span>
+                        <span class="block text-xs opacity-60 uppercase">Player OPS</span>
+                        <span id="playerOps" class="text-xl font-bold">0.000</span>
                     </div>
                     <div>
-                        <span class="block text-xs opacity-60 uppercase">Games</span>
-                        <span id="playerGames" class="text-2xl font-bold">0</span>
+                        <span class="block text-xs opacity-60 uppercase text-yellow-300">Player wRC+</span>
+                        <span id="playerWrc" class="text-xl font-bold text-yellow-300">0</span>
+                    </div>
+                    <div>
+                        <span class="block text-xs opacity-60 uppercase">Player PA</span>
+                        <span id="playerGames" class="text-xl font-bold">0</span>
                     </div>
                 </div>
             </div>
@@ -93,33 +88,29 @@
 </div>
 
 <script>
-    // 1. 데이터 파싱
-    const allData = JSON.parse('{{ all_data|safe }}'); // { kbo: {...}, mlb: {...} }
-    const years = JSON.parse('{{ years|safe }}');
+    const allData = {{ all_data|safe }};
+    const years = {{ years|safe }};
 
-    // 2. DOM 요소 & 상태 변수
-    let currentLeague = 'mlb'; // 기본값
+    let currentLeague = 'mlb';
     let trendChart = null;
 
     const yearSelect = document.getElementById('yearSelect');
     const teamSelect = document.getElementById('teamSelect');
     const orderSelect = document.getElementById('orderSelect');
 
-    // 3. 연도 초기화
+    // 연도 초기화
     years.forEach(y => {
         const option = document.createElement('option');
         option.value = y;
         option.text = y;
         yearSelect.appendChild(option);
     });
-    yearSelect.value = 2024;
+    yearSelect.value = years[years.length - 1];
     orderSelect.value = '2';
 
-    // 4. 리그 설정 함수 (핵심!)
     function setLeague(league) {
         currentLeague = league;
-
-        // 버튼 스타일 토글
+        
         const btnMlb = document.getElementById('btn-mlb');
         const btnKbo = document.getElementById('btn-kbo');
         const activeClass = "bg-primary text-white shadow-md";
@@ -133,52 +124,58 @@
             btnKbo.className = `px-5 py-2 rounded-lg font-bold transition text-sm ${activeClass}`;
         }
 
-        // 팀 드롭다운 다시 채우기
         populateTeams();
-        
-        // 차트 및 정보 업데이트
         updateDashboard();
     }
 
-    // 5. 팀 드롭다운 채우기 함수
     function populateTeams() {
         const teamList = allData[currentLeague].team_list;
-        
-        // 기존 옵션 비우기
         teamSelect.innerHTML = '';
-
         teamList.forEach(t => {
             const option = document.createElement('option');
             option.value = t;
             option.text = t;
             teamSelect.appendChild(option);
         });
-
-        // 첫 번째 팀 자동 선택
-        teamSelect.value = teamList[0];
+        if (teamList.length > 0) teamSelect.value = teamList[0];
     }
 
-    // 6. 대시보드 업데이트 함수
     function updateDashboard() {
         const selectedYear = yearSelect.value;
         const selectedTeam = teamSelect.value;
         const selectedOrder = orderSelect.value;
         
-        // 현재 리그 데이터 가져오기
         const leagueDataObj = allData[currentLeague];
         const teamsData = leagueDataObj.teams_data;
         const avgData = leagueDataObj.avg_data;
 
-        // --- A. 차트 업데이트 (Trend) ---
-        // 해당 팀의 10년치 데이터
-        const teamOpsTrend = years.map(y => teamsData[selectedTeam][y][selectedOrder].ops);
-        const leagueOpsTrend = years.map(y => avgData[y][selectedOrder]);
+        // --- A. 차트 업데이트 (Team Stats) ---
+        // 팀 데이터 추출
+        const teamOpsTrend = [];
+        const teamMeta = []; // 툴팁용 메타데이터 (Team PA, Team wRC+)
+
+        years.forEach(y => {
+            const data = teamsData[selectedTeam]?.[y]?.[selectedOrder];
+            if (data) {
+                teamOpsTrend.push(data.team_ops);
+                teamMeta.push({
+                    year: y,
+                    wrc: data.team_wrc,
+                    pa: data.team_pa
+                });
+            } else {
+                teamOpsTrend.push(null);
+                teamMeta.push(null);
+            }
+        });
+
+        // 리그 평균 데이터 추출
+        const leagueOpsTrend = years.map(y => avgData[y]?.[selectedOrder]?.ops || null);
 
         document.getElementById('chartTitleTeam').innerText = selectedTeam;
         document.getElementById('chartTitleOrder').innerText = selectedOrder + '번 타자';
 
         const ctx = document.getElementById('trendChart').getContext('2d');
-        
         if (trendChart) trendChart.destroy();
 
         trendChart = new Chart(ctx, {
@@ -187,22 +184,20 @@
                 labels: years,
                 datasets: [
                     {
-                        // 예: "LAD 2번 타자 OPS"
-                        label: `${selectedTeam} ${selectedOrder}번 타자 OPS`, 
+                        label: `${selectedTeam} ${selectedOrder}번 타자 (Team OPS)`, 
                         data: teamOpsTrend,
-                        borderColor: '#3B82F6', // Blue
+                        borderColor: '#3B82F6',
                         backgroundColor: 'rgba(59, 130, 246, 0.1)',
                         borderWidth: 3,
                         tension: 0.3,
                         fill: true
                     },
                     {
-                        // [수정] 예: "MLB 리그 2번 타자 평균" 이라고 명시적으로 표기
-                        label: `${currentLeague.toUpperCase()} 리그 ${selectedOrder}번 타자 평균`, 
+                        label: `${currentLeague.toUpperCase()} Avg`, 
                         data: leagueOpsTrend,
-                        borderColor: '#9CA3AF', // Gray
+                        borderColor: '#9CA3AF',
                         borderWidth: 2,
-                        borderDash: [5, 5], // 점선
+                        borderDash: [5, 5],
                         tension: 0.3,
                         fill: false
                     }
@@ -211,9 +206,29 @@
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
                 plugins: {
                     legend: { position: 'bottom' },
-                    tooltip: { mode: 'index', intersect: false }
+                    tooltip: {
+                        callbacks: {
+                            // 툴팁에 팀 상세 정보 표시
+                            afterBody: function(context) {
+                                const teamTooltip = context.find(item => item.datasetIndex === 0); // 팀 데이터셋(첫번째)
+                                if (teamTooltip) {
+                                    const idx = teamTooltip.dataIndex;
+                                    const meta = teamMeta[idx];
+                                    if (meta) {
+                                        return [
+                                            `-----------------`,
+                                            `Team PA: ${meta.pa}`,
+                                            `Team wRC+: ${meta.wrc}`
+                                        ];
+                                    }
+                                }
+                                return [];
+                            }
+                        }
+                    }
                 },
                 scales: {
                     y: { 
@@ -225,23 +240,31 @@
             }
         });
 
-        // --- B. 선수 카드 업데이트 ---
-        const playerData = teamsData[selectedTeam][selectedYear][selectedOrder];
-        
+        // --- B. 선수 카드 업데이트 (Player Stats) ---
+        let playerData = teamsData[selectedTeam]?.[selectedYear]?.[selectedOrder];
+
         document.getElementById('playerYear').innerText = selectedYear;
-        document.getElementById('playerName').innerText = playerData.player_name;
-        document.getElementById('playerTeam').innerText = `${selectedTeam} #${selectedOrder}`;
-        document.getElementById('playerOps').innerText = playerData.ops.toFixed(3);
-        document.getElementById('playerGames').innerText = playerData.games;
+        
+        if (playerData) {
+            // 선수 개인 성적 표시
+            document.getElementById('playerName').innerText = playerData.player_name;
+            document.getElementById('playerTeam').innerText = `${selectedTeam} #${selectedOrder}`;
+            document.getElementById('playerOps').innerText = playerData.player_ops.toFixed(3); // 개인 OPS
+            document.getElementById('playerWrc').innerText = playerData.player_wrc;           // 개인 wRC+
+            document.getElementById('playerGames').innerText = playerData.player_pa;            // 개인 PA
+        } else {
+            document.getElementById('playerName').innerText = "-";
+            document.getElementById('playerTeam').innerText = "No Data";
+            document.getElementById('playerOps').innerText = "-";
+            document.getElementById('playerWrc').innerText = "-";
+            document.getElementById('playerGames').innerText = "-";
+        }
     }
 
-    // 7. 이벤트 리스너
     yearSelect.addEventListener('change', updateDashboard);
     teamSelect.addEventListener('change', updateDashboard);
     orderSelect.addEventListener('change', updateDashboard);
 
-    // 초기 실행 (MLB 기본)
     setLeague('mlb');
-
 </script>
 {% endblock %}
