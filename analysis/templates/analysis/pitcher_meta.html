@@ -7,14 +7,15 @@
         <h1 class="text-4xl font-bold text-gray-900 dark:text-white">선발 투수 가치 평가</h1>
         <p class="text-lg text-gray-600 dark:text-gray-400">
             이닝 소화(Inning Eating) vs 실점 억제(Run Suppression)<br>
-            팀 승리에 더 기여하는 투수는 누구일까요?
+            팀 승리에 더 기여하는 투수는 누구일까요?<br>
+            최근 10년간 데이터 기반으로 직접 비교해보세요!
         </p>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         
         <div class="bg-white dark:bg-cardDark p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
-            <h3 class="text-xl font-bold mb-4 text-blue-500">투수 A (이닝이터)</h3>
+            <h3 class="text-xl font-bold mb-4 text-blue-500">투수 A</h3>
             <div class="flex space-x-4">
                 <div class="w-1/2">
                     <label class="block text-sm font-medium text-gray-500 mb-1">이닝 (IP)</label>
@@ -28,13 +29,13 @@
                 </div>
             </div>
             <div class="mt-4 text-center">
-                <span class="text-sm text-gray-400">예상 승률</span>
+                <span class="text-sm text-gray-400">기대 승률</span>
                 <div id="win-rate-a" class="text-4xl font-bold text-gray-900 dark:text-white">--%</div>
             </div>
         </div>
 
         <div class="bg-white dark:bg-cardDark p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
-            <h3 class="text-xl font-bold mb-4 text-red-500">투수 B (짠물투)</h3>
+            <h3 class="text-xl font-bold mb-4 text-red-500">투수 B</h3>
             <div class="flex space-x-4">
                 <div class="w-1/2">
                     <label class="block text-sm font-medium text-gray-500 mb-1">이닝 (IP)</label>
@@ -48,7 +49,7 @@
                 </div>
             </div>
             <div class="mt-4 text-center">
-                <span class="text-sm text-gray-400">예상 승률</span>
+                <span class="text-sm text-gray-400">기대 승률</span>
                 <div id="win-rate-b" class="text-4xl font-bold text-gray-900 dark:text-white">--%</div>
             </div>
         </div>
@@ -69,7 +70,8 @@
 <div class="mt-12 bg-white dark:bg-cardDark p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
         <h3 class="text-xl font-bold mb-2">승리 확률 매트릭스 (Win Probability Matrix)</h3>
         <p class="text-sm text-gray-500 mb-6">
-            선발 투수의 이닝과 실점에 따른 팀의 기대 승률입니다. (범위: 3~9이닝, 0~7실점)
+            선발 투수의 이닝과 실점에 따른 팀의 기대 승률입니다. (범위: 3~9이닝, 0~7실점)<br>
+            2016~2025 시즌 데이터 총 22,758경기의 결과입니다.
         </p>
 
         <div class="overflow-x-auto">

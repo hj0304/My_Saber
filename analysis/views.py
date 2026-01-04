@@ -18,7 +18,7 @@ def strong_second_view(request):
     
     # 1. KBO 가상 데이터 (유지)
     kbo_teams = ["KIA", "Samsung", "LG", "Doosan", "KT", "SSG", "Lotte", "Hanwha", "NC", "Kiwoom"]
-    kbo_players = ["김도영", "구자욱", "홍창기", "양의지", "최정", "로하스", "에레디아", "박건우", "강백호", "노시환"]
+    kbo_players = ["김덕협", "탁귀필", "하우돈", "홍혁팔", "엄덕구", "강팔춘", "마석대", "좌병덕", "박두창", "한만재"]
     
     def generate_kbo_dummy_data(teams, player_names):
         # ... (기존 코드와 동일) ...
