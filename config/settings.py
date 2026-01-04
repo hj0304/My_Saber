@@ -7,7 +7,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
-# [수정됨] 깃허브에는 이 '가짜 키'가 올라갑니다. (해커가 가져가도 쓸모 없음)
+# [수정됨]
 SECRET_KEY = 'django-insecure-dummy-key-for-github-upload'
 
 # [수정됨] 기본적으로 디버그는 끕니다. (로컬 설정 파일이 켜줄 것입니다)
@@ -25,7 +25,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.humanize',
-    # 내가 만든 앱들
+
     'core',
     'analysis',
     'simulation',
@@ -86,7 +86,7 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 # ------------------------------------------------------------------------------
 # [핵심] 로컬 설정 파일 불러오기
 # ------------------------------------------------------------------------------
-# local_settings.py 파일이 있으면 그 안의 설정을 불러와서 위 내용들을 덮어씁니다.
+# local_settings.py 파일이 있으면 그 안의 설정을 불러와서 위 내용들을 덮어씀.
 try:
     from .local_settings import *
 except ImportError:

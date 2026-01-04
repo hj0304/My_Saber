@@ -16,7 +16,6 @@ valid_at_bats = df[df['events'].notnull()]
 print(f"✅ 타석 결과가 나온 데이터(타수/사사구 등): {len(valid_at_bats):,} 개")
 
 # 2. 여기서 치명적인 결측치가 있는지 확인합니다.
-# "결과(events)는 있는데, 타자 이름이나 날짜가 없다?" -> 이건 진짜 문제입니다.
 critical_missing = valid_at_bats[valid_at_bats['player_name'].isnull() | valid_at_bats['game_date'].isnull()]
 
 if len(critical_missing) > 0:
