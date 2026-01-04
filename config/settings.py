@@ -4,18 +4,16 @@ import os
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-bz*wohff-tct^q0vbb3wva7n+7q^qy5$znwh&+i86vki#1@iu5'
+# [수정됨] 깃허브에는 이 '가짜 키'가 올라갑니다. (해커가 가져가도 쓸모 없음)
+SECRET_KEY = 'django-insecure-dummy-key-for-github-upload'
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# [수정됨] 기본적으로 디버그는 끕니다. (로컬 설정 파일이 켜줄 것입니다)
+DEBUG = False
 
 ALLOWED_HOSTS = []
-
 
 # Application definition
 
@@ -31,7 +29,6 @@ INSTALLED_APPS = [
     'core',
     'analysis',
     'simulation',
-    
 ]
 
 MIDDLEWARE = [
@@ -49,7 +46,7 @@ ROOT_URLCONF = 'config.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [os.path.join(BASE_DIR, 'templates')], # 전역 템플릿 폴더,
+        'DIRS': [os.path.join(BASE_DIR, 'templates')],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -63,50 +60,34 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
-
 # Database
-# https://docs.djangoproject.com/en/6.0/ref/settings/#databases
-
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
-
+# 기본값은 빈 딕셔너리거나 더미 설정 (로컬 설정이 덮어씀)
+DATABASES = {}
 
 # Password validation
-# https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
-
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
-
 # Internationalization
-# https://docs.djangoproject.com/en/6.0/topics/i18n/
-
 LANGUAGE_CODE = 'en-us'
-
 TIME_ZONE = 'UTC'
-
 USE_I18N = True
-
 USE_TZ = True
 
-
 # Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/6.0/howto/static-files/
-
 STATIC_URL = 'static/'
+# [추가] 배포 시 정적 파일을 모을 경로
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+# ------------------------------------------------------------------------------
+# [핵심] 로컬 설정 파일 불러오기
+# ------------------------------------------------------------------------------
+# local_settings.py 파일이 있으면 그 안의 설정을 불러와서 위 내용들을 덮어씁니다.
+try:
+    from .local_settings import *
+except ImportError:
+    pass
