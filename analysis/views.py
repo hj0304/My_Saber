@@ -16,123 +16,12 @@ from django.db.models import Max
 def strong_second_view(request):
     target_years = list(range(2016, 2026))
     
-    # KBO 가상 데이터용
+    # 1. KBO 가상 데이터 (유지)
     kbo_teams = ["KIA", "Samsung", "LG", "Doosan", "KT", "SSG", "Lotte", "Hanwha", "NC", "Kiwoom"]
     kbo_players = ["김도영", "구자욱", "홍창기", "양의지", "최정", "로하스", "에레디아", "박건우", "강백호", "노시환"]
-
-    def load_mlb_real_data():
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        data_dir = os.path.join(base_dir, 'analysis', 'data')
-        
-        mlb_data = {}
-        mlb_teams_set = set()
-        avg_data = {y: {} for y in target_years}
-
-        suffixes = {1: '1st', 2: '2nd', 3: '3rd', 4: '4th', 
-                    5: '5th', 6: '6th', 7: '7th', 8: '8th', 9: '9th'}
-        
-        print("--- MLB 데이터 로드 시작 (데이터 분리 적용) ---")
-
-        for folder_year in target_years:
-            for order, suffix in suffixes.items():
-                filename = f"Splits Leaderboard Data Batting {suffix}.csv"
-                stats_path = os.path.join(data_dir, 'batting_order', str(folder_year), filename)
-                freq_path = os.path.join(data_dir, 'frequency', str(folder_year), filename)
-
-                if not os.path.exists(stats_path) or not os.path.exists(freq_path):
-                    continue
-
-                try:
-                    # (1) 팀 성적 데이터 로드
-                    df_stats = pd.read_csv(stats_path, encoding='utf-8-sig')
-                    df_stats.columns = df_stats.columns.str.strip()
-
-                    # (2) 선수 빈도 데이터 로드
-                    df_freq = pd.read_csv(freq_path, encoding='utf-8-sig')
-                    df_freq.columns = df_freq.columns.str.strip()
-
-                    # (3) 데이터 전처리 (숫자 변환)
-                    # 팀 데이터 숫자 변환
-                    for col in ['OPS', 'wRC+', 'PA', 'Season']:
-                        if col in df_stats.columns:
-                            df_stats[col] = pd.to_numeric(df_stats[col], errors='coerce').fillna(0)
-                    
-                    # 선수 데이터 숫자 변환
-                    for col in ['PA', 'OPS', 'wRC+']:
-                        if col in df_freq.columns:
-                            df_freq[col] = pd.to_numeric(df_freq[col], errors='coerce').fillna(0)
-
-                    # (4) 대표 선수 추출 (선수 개인 성적 포함)
-                    if not df_freq.empty and 'PA' in df_freq.columns:
-                        df_freq = df_freq.sort_values(by='PA', ascending=False)
-                        # 팀별 최다 타석 선수 1명 추출
-                        df_rep = df_freq.drop_duplicates(subset=['Tm'], keep='first').copy()
-                        
-                        # [핵심] 선수 개인 성적 컬럼명 변경 (팀 성적과 구분하기 위해 'Player' 접두사 붙임)
-                        # Name -> PlayerName, PA -> PlayerPA, OPS -> PlayerOPS, wRC+ -> PlayerWRC
-                        rename_map = {
-                            'Name': 'PlayerName',
-                            'PA': 'PlayerPA',
-                            'OPS': 'PlayerOPS',
-                            'wRC+': 'PlayerWRC'
-                        }
-                        # 존재하는 컬럼만 변경
-                        rename_cols = {k: v for k, v in rename_map.items() if k in df_rep.columns}
-                        df_rep = df_rep.rename(columns=rename_cols)
-                    else:
-                        df_rep = pd.DataFrame(columns=['Tm', 'PlayerName', 'PlayerPA', 'PlayerOPS', 'PlayerWRC'])
-
-                    # (5) 데이터 병합 (Team 기준)
-                    # df_stats(팀 성적) + df_rep(선수 성적)
-                    # 필요한 컬럼만 선택해서 병합
-                    player_cols = [c for c in ['Tm', 'PlayerName', 'PlayerPA', 'PlayerOPS', 'PlayerWRC'] if c in df_rep.columns]
-                    merged_df = pd.merge(df_stats, df_rep[player_cols], on='Tm', how='left')
-
-                    # (6) 딕셔너리 저장
-                    for _, row in merged_df.iterrows():
-                        team = row['Tm']
-                        real_year = int(row['Season']) # 파일 내부의 실제 연도 사용
-                        
-                        if real_year not in target_years: continue
-
-                        if team not in mlb_data: mlb_data[team] = {}
-                        if real_year not in mlb_data[team]: mlb_data[team][real_year] = {}
-                        
-                        # 데이터 할당
-                        mlb_data[team][real_year][order] = {
-                            # A. 팀 성적 (좌측 그래프용)
-                            'team_ops': round(row['OPS'], 3),
-                            'team_wrc': round(row['wRC+'], 1) if 'wRC+' in row else 0.0,
-                            'team_pa': int(row['PA']) if 'PA' in row else 0,
-                            
-                            # B. 선수 성적 (우측 박스용)
-                            'player_name': row['PlayerName'] if pd.notna(row.get('PlayerName')) else "Unknown",
-                            'player_pa': int(row['PlayerPA']) if pd.notna(row.get('PlayerPA')) else 0,
-                            'player_ops': round(row['PlayerOPS'], 3) if pd.notna(row.get('PlayerOPS')) else 0.000,
-                            'player_wrc': round(row['PlayerWRC'], 1) if pd.notna(row.get('PlayerWRC')) else 0.0
-                        }
-                        mlb_teams_set.add(team)
-
-                    # (7) 리그 평균 계산
-                    if not df_stats.empty:
-                        current_file_year = int(df_stats['Season'].mode()[0])
-                        if current_file_year in target_years:
-                            if order not in avg_data[current_file_year]:
-                                avg_data[current_file_year][order] = {}
-                            
-                            avg_data[current_file_year][order] = {
-                                'ops': round(df_stats['OPS'].mean(), 3),
-                                'wrc_plus': round(df_stats['wRC+'].mean(), 1) if 'wRC+' in df_stats.columns else 0.0
-                            }
-
-                except Exception as e:
-                    print(f"[Error] {folder_year}년 {order}번 타순 처리 중 오류: {e}")
-
-        print(f"--- 로드 완료: {len(mlb_teams_set)}개 팀 ---")
-        return mlb_data, avg_data, sorted(list(mlb_teams_set))
-
-    # KBO 더미 데이터 (구조 맞춰줌)
+    
     def generate_kbo_dummy_data(teams, player_names):
+        # ... (기존 코드와 동일) ...
         league_data = {} 
         avg_data = {}    
         for year in target_years:
@@ -156,9 +45,29 @@ def strong_second_view(request):
                     }
         return league_data, avg_data
 
-    mlb_teams_data, mlb_avg, mlb_team_list = load_mlb_real_data()
     kbo_teams_data, kbo_avg = generate_kbo_dummy_data(kbo_teams, kbo_players)
 
+    # 2. MLB 데이터 로드 (JSON 방식 - 개선됨)
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    json_path = os.path.join(base_dir, 'analysis', 'data', 'strong_second_data.json')
+    
+    mlb_teams_data = {}
+    mlb_avg = {}
+    mlb_team_list = []
+
+    if os.path.exists(json_path):
+        try:
+            with open(json_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                mlb_teams_data = data.get('mlb_teams_data', {})
+                mlb_avg = data.get('mlb_avg', {})
+                mlb_team_list = data.get('mlb_team_list', [])
+        except Exception as e:
+            print(f"Error loading strong second JSON: {e}")
+    else:
+        print("Warning: strong_second_data.json not found. Run build_strong_second.py first.")
+
+    # 3. Context 전달
     all_data = {
         'kbo': {'teams_data': kbo_teams_data, 'avg_data': kbo_avg, 'team_list': kbo_teams},
         'mlb': {'teams_data': mlb_teams_data, 'avg_data': mlb_avg, 'team_list': mlb_team_list}
@@ -172,91 +81,79 @@ def strong_second_view(request):
     return render(request, 'analysis/strong_second.html', context)
 
 # ------------------------------------------------------------------------------------------------------------------------
-# 선발 투수 메타
+# 선발 투수 메타 (실제 데이터 반영 버전)
 def pitcher_meta_view(request):
-    # --- 가상 데이터 생성 로직 (추후 실제 DB 연동) ---
-    # 가정: 기본 승률 50%
-    # 1. 실점이 적을수록 승률 대폭 상승
-    # 2. 이닝을 많이 먹을수록(불펜 소모 감소) 승률 소폭 상승
+    # 1. JSON 파일 경로
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    json_path = os.path.join(base_dir, 'analysis', 'data', 'pitcher_meta_matrix.json')
     
-    matrix_data = []
-    
-    for ip in range(1, 10): # 1이닝 ~ 9이닝
-        for runs in range(0, 10): # 0실점 ~ 9실점
-            
-            # 승률 계산 알고리즘 (예시)
-            base_win_rate = 50
-            run_impact = (4.5 - runs) * 8  # 평균 4.5점 기준, 1점 줄일 때마다 승률 8% 변동
-            inning_impact = (ip - 6) * 1.5 # 6이닝 기준, 1이닝 더 던지면 1.5% 이득 (불펜 아낌)
-            
-            final_win_rate = base_win_rate + run_impact + inning_impact
-            
-            # 0~100 사이로 보정
-            final_win_rate = max(0, min(99.9, final_win_rate))
-            
-            matrix_data.append({
-                'ip': ip,
-                'runs': runs,
-                'win_rate': round(final_win_rate, 1)
-            })
+    real_data = []
+    if os.path.exists(json_path):
+        try:
+            with open(json_path, 'r', encoding='utf-8') as f:
+                real_data = json.load(f)
+        except Exception as e:
+            print(f"Error loading JSON: {e}")
+            real_data = []
 
-    # 프론트엔드(JavaScript)에서 쓰기 편하게 JSON 형태로 변환
-    context = {
-        'matrix_json': json.dumps(matrix_data)
-    }
-    
-    return render(request, 'analysis/pitcher_meta.html', context)
+    # 2. 데이터 매핑
+    data_map = {}
+    for d in real_data:
+        data_map[(d['ip'], d['runs'])] = {
+            'win_rate': d['win_rate'],
+            'count': d.get('sample_size', 0)
+        }
 
-# ------------------------------------------------------------------------------------------------------------------------
-# 선발 투수 메타, 기대승리 그래프
-def pitcher_meta_view(request):
-    # 1. 계산기용 데이터 (넓은 범위: 1~9이닝, 0~10실점)
-    # 기존 로직 유지
-    calculator_data = []
-    for ip in range(1, 10):
-        for runs in range(0, 11):
-            # 가상 승률 로직 (단순화)
-            # 기본 50% + (9이닝 기준 이닝당 2% 가산) - (실점당 8% 감산)
-            win_rate = 50 + ((ip - 5) * 2) - (runs * 8)
-            win_rate = max(0, min(99.9, win_rate)) # 0~99.9% 제한
-            
-            calculator_data.append({
-                'ip': ip,
-                'runs': runs,
-                'win_rate': round(win_rate, 1)
-            })
-
-    # 2. 히트맵용 데이터 (특정 범위: 3~9이닝, 0~7실점)
-    # 템플릿에서 그리기 편하게 2차원 리스트 구조로 만듭니다.
+    # 3. 히트맵 데이터 생성
     heatmap_rows = []
-    
-    for ip in range(9, 2, -1): # 9이닝부터 3이닝까지 역순 (표의 위쪽이 9이닝이 되도록)
+    for ip in range(9, 2, -1): # 9 ~ 3이닝
         row_data = {'ip': ip, 'cols': []}
-        for runs in range(0, 8): # 0실점 ~ 7실점
+        for runs in range(0, 8): # 0 ~ 7실점
             
-            # 위와 동일한 로직 사용 (나중엔 실제 데이터 쿼리로 대체)
-            win_rate = 50 + ((ip - 5) * 2) - (runs * 8)
-            win_rate = max(0, min(99.9, win_rate))
+            data = data_map.get((ip, runs))
             
-            # 색상 투명도 계산 (승률이 높을수록 진하게)
-            # 50%를 기준으로 0~1 사이의 alpha값 생성
-            # 간단하게 승률 자체를 불투명도로 사용 (0.0 ~ 1.0)
-            opacity = win_rate / 100
-            
-            row_data['cols'].append({
-                'runs': runs,
-                'win_rate': round(win_rate, 1),
-                'opacity': opacity
-            })
+            if data is None:
+                # 데이터 없음 (N/A)
+                row_data['cols'].append({
+                    'win_rate': None,
+                    'count': 0,
+                    'color_type': 'none', # 색상 타입 없음
+                    'opacity': 0
+                })
+            else:
+                win_rate = data['win_rate']
+                count = data['count']
+                
+                # [수정] 컬러 스케일 로직 (Red-Blue Diverging)
+                # 50%를 기준으로 거리 계산 (0.0 ~ 1.0)
+                # 예: 50% -> 0.0 (회색), 100% -> 1.0 (진한 파랑), 0% -> 1.0 (진한 빨강)
+                intensity = abs(win_rate - 50) * 2 / 100.0
+                
+                # 최소 가시성 확보 (너무 연하지 않게 기본 0.1 추가)
+                opacity = 0.1 + (intensity * 0.9)
+                
+                # 색상 결정
+                if win_rate >= 50:
+                    color_type = 'blue' # 승리 확률 높음
+                else:
+                    color_type = 'red'  # 승리 확률 낮음 (패배 확률 높음)
+
+                row_data['cols'].append({
+                    'runs': runs,
+                    'win_rate': win_rate,
+                    'count': count,
+                    'color_type': color_type, # 템플릿에서 class 분기용
+                    'opacity': opacity
+                })
+                
         heatmap_rows.append(row_data)
 
     context = {
-        'matrix_json': json.dumps(calculator_data), # JS 계산기용
-        'heatmap_rows': heatmap_rows                # HTML 표 그리기용
+        'matrix_json': json.dumps(real_data),
+        'heatmap_rows': heatmap_rows
     }
     
     return render(request, 'analysis/pitcher_meta.html', context)
-
 # ------------------------------------------------------------------------------------------------------------------------
 # 불펜투수 지표
 def relief_metrics_view(request):

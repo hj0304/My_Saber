@@ -10,7 +10,7 @@ db.sqlite3
 media
 staticfiles
 
-# 가상환경 (제일 중요! 이거 올라가면 안 됨)
+# 가상환경 (제일 중요!)
 venv/
 env/
 .env
@@ -19,21 +19,19 @@ env/
 .idea/
 .vscode/
 
-# --- [수정됨] 데이터 관련 폴더들 ---
 
 # Simulation 앱 데이터
 simulation/data/
 
-# Analysis 앱 데이터 (새로 추가한 부분!)
-# RP_stats, Strong_2nd 관련 CSV 파일들을 무시합니다.
+# Analysis 앱 데이터
+# RP_stats, Strong_2nd 관련 CSV 파일들을 무시.
 analysis/data/
 
-# DS에서 또 무거운 것들
+# D.S에서 또 무거운 것들
 data_science/*.json
 data_science/*.csv
 data_science/*.xlsx
 
-# --- 추가 내용 ---
 
 # Mac/Windows 시스템 파일 (협업 시 충돌 방지)
 .DS_Store
@@ -43,5 +41,9 @@ Thumbs.db
 data_science/raw_data/
 data_science/data/
 
-# 혹시 주피터 노트북을 쓴다면
+# 혹시 주피터 노트북을 쓰게되면
 .ipynb_checkpoints/
+
+
+# 기타 예방
+*.parquet
